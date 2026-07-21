@@ -1,4 +1,5 @@
 .worktrees/
-web/node_modules/
-local-action.db
-local-action
+.claude/
+cmd/local-action/web/node_modules/
+/local-action.db
+/local-action
