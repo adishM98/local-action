@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"testing"
 )
@@ -58,5 +59,38 @@ func TestSecrets_UpsertListGetDelete(t *testing.T) {
 	entries, _ = ListSecrets(db, "/repo/a", KindSecret)
 	if len(entries) != 0 {
 		t.Fatalf("expected no entries after delete, got %+v", entries)
+	}
+	// ListSecrets must return an empty slice, not nil, for a zero-row result:
+	// encoding/json marshals nil as `null`, which crashes SecretsPanel.jsx's
+	// entries.map() for a brand new repo with no secrets yet.
+	b, err := json.Marshal(entries)
+	if err != nil {
+		t.Fatalf("marshal entries: %v", err)
+	}
+	if string(b) != "[]" {
+		t.Fatalf("expected empty ListSecrets to marshal as [], got %s", b)
+	}
+}
+
+func TestListSecrets_EmptyMarshalsAsEmptyArray(t *testing.T) {
+	db, err := OpenDB(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+
+	entries, err := ListSecrets(db, "/repo/brand-new", KindSecret)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("expected no entries, got %+v", entries)
+	}
+	b, err := json.Marshal(entries)
+	if err != nil {
+		t.Fatalf("marshal entries: %v", err)
+	}
+	if string(b) != "[]" {
+		t.Fatalf("expected empty ListSecrets to marshal as [], got %s", b)
 	}
 }

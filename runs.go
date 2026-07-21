@@ -60,7 +60,7 @@ func GetRunLogs(db *sql.DB, runID int64) ([]string, error) {
 	}
 	defer rows.Close()
 
-	var lines []string
+	lines := []string{}
 	for rows.Next() {
 		var text string
 		if err := rows.Scan(&text); err != nil {
@@ -92,7 +92,7 @@ func ListRuns(db *sql.DB, repoPath string) ([]Run, error) {
 	}
 	defer rows.Close()
 
-	var runs []Run
+	runs := []Run{}
 	for rows.Next() {
 		var r Run
 		var status string

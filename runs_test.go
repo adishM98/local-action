@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"testing"
 	"time"
@@ -73,5 +74,62 @@ func TestRuns_CreateGetUpdateList(t *testing.T) {
 	}
 	if len(runs) != 2 || runs[0].ID != id2 {
 		t.Fatalf("expected newest-first order with id2 first, got %+v", runs)
+	}
+}
+
+// TestListRuns_EmptyMarshalsAsEmptyArray guards against ListRuns returning a
+// nil slice for a zero-row result: encoding/json marshals nil as `null`,
+// which crashes frontend consumers that call .map() on the response
+// (HistoryPanel.jsx) for a repo with no run history yet.
+func TestListRuns_EmptyMarshalsAsEmptyArray(t *testing.T) {
+	db, err := OpenDB(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+
+	runs, err := ListRuns(db, "/repo/does-not-exist")
+	if err != nil {
+		t.Fatalf("list runs: %v", err)
+	}
+	if len(runs) != 0 {
+		t.Fatalf("expected no runs, got %+v", runs)
+	}
+	b, err := json.Marshal(runs)
+	if err != nil {
+		t.Fatalf("marshal runs: %v", err)
+	}
+	if string(b) != "[]" {
+		t.Fatalf("expected empty ListRuns to marshal as [], got %s", b)
+	}
+}
+
+// TestGetRunLogs_EmptyMarshalsAsEmptyArray guards the same nil-slice-to-null
+// pitfall for GetRunLogs, used by the log replay/history views.
+func TestGetRunLogs_EmptyMarshalsAsEmptyArray(t *testing.T) {
+	db, err := OpenDB(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+
+	id, err := CreateRun(db, Run{RepoPath: "/repo/a", WorkflowFile: "wf.yml", Event: "push", Inputs: "{}", Status: StatusQueued, CreatedAt: time.Now().Unix()})
+	if err != nil {
+		t.Fatalf("create run: %v", err)
+	}
+
+	logs, err := GetRunLogs(db, id)
+	if err != nil {
+		t.Fatalf("get logs: %v", err)
+	}
+	if len(logs) != 0 {
+		t.Fatalf("expected no logs, got %+v", logs)
+	}
+	b, err := json.Marshal(logs)
+	if err != nil {
+		t.Fatalf("marshal logs: %v", err)
+	}
+	if string(b) != "[]" {
+		t.Fatalf("expected empty GetRunLogs to marshal as [], got %s", b)
 	}
 }

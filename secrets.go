@@ -40,7 +40,7 @@ func ListSecrets(db *sql.DB, repoPath string, kind SecretKind) ([]SecretEntry, e
 	}
 	defer rows.Close()
 
-	var entries []SecretEntry
+	entries := []SecretEntry{}
 	for rows.Next() {
 		var e SecretEntry
 		var kindStr string
