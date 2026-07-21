@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	addr := flag.String("addr", ":8090", "listen address")
+	addr := flag.String("addr", "127.0.0.1:8090", "listen address")
 	dbPath := flag.String("db", "local-action.db", "path to sqlite database file")
 	actBin := flag.String("act-bin", "act", "path to act executable")
 	flag.Parse()
@@ -29,7 +29,7 @@ func main() {
 	defer db.Close()
 
 	hub := NewHub()
-	engine := NewEngine(db, key, *actBin, hub.Broadcast)
+	engine := NewEngine(db, key, *actBin, hub.Broadcast, hub.Forget)
 
 	mux := NewRouter(db, key, engine, hub, *actBin)
 
