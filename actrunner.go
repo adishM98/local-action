@@ -203,7 +203,14 @@ func (e *Engine) writeDotenvTemp(pattern, repoPath string, entries []SecretEntry
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
+	name := f.Name()
+	success := false
+	defer func() {
+		f.Close()
+		if !success {
+			os.Remove(name)
+		}
+	}()
 	if err := f.Chmod(0600); err != nil {
 		return "", err
 	}
@@ -217,5 +224,6 @@ func (e *Engine) writeDotenvTemp(pattern, repoPath string, entries []SecretEntry
 	for k, v := range extra {
 		fmt.Fprintf(f, "%s=%s\n", k, v)
 	}
-	return f.Name(), nil
+	success = true
+	return name, nil
 }
