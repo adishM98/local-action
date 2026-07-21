@@ -57,3 +57,28 @@ func TestHub_ReplayThenLiveBroadcast(t *testing.T) {
 		t.Fatalf("expected live line, got %q", msg3)
 	}
 }
+
+// TestHub_ForgetReleasesBuffer guards against the hub's per-run log buffer
+// growing forever: once a run is finished, Forget must drop its buffered
+// lines so a long-running server doesn't leak memory across many runs.
+func TestHub_ForgetReleasesBuffer(t *testing.T) {
+	hub := NewHub()
+
+	hub.Broadcast(7, "line 1")
+	hub.Broadcast(7, "line 2")
+
+	hub.mu.Lock()
+	if len(hub.buffers[7]) != 2 {
+		hub.mu.Unlock()
+		t.Fatalf("expected buffer to hold 2 lines before Forget")
+	}
+	hub.mu.Unlock()
+
+	hub.Forget(7)
+
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
+	if _, ok := hub.buffers[7]; ok {
+		t.Fatalf("expected buffer for run 7 to be removed after Forget, got %v", hub.buffers[7])
+	}
+}

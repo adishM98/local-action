@@ -22,7 +22,7 @@ func newTestRouter(t *testing.T, actStub string) (*http.ServeMux, *sql.DB, strin
 	}
 	key := make([]byte, keySize)
 	hub := NewHub()
-	engine := NewEngine(db, key, actStub, hub.Broadcast)
+	engine := NewEngine(db, key, actStub, hub.Broadcast, hub.Forget)
 	return NewRouter(db, key, engine, hub, actStub), db, dir
 }
 

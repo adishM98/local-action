@@ -28,6 +28,17 @@ func NewHub() *Hub {
 	}
 }
 
+// Forget releases the buffered log lines for runID. It must only be called
+// once a run has reached a terminal status (success/failed/cancelled) — the
+// buffer is what allows a client connecting mid-run to replay history, so
+// freeing it earlier would drop lines for anyone still watching. The
+// run_logs table remains the durable source of truth for replay after this.
+func (h *Hub) Forget(runID int64) {
+	h.mu.Lock()
+	delete(h.buffers, runID)
+	h.mu.Unlock()
+}
+
 func (h *Hub) Broadcast(runID int64, line string) {
 	h.mu.Lock()
 	h.buffers[runID] = append(h.buffers[runID], line)

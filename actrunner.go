@@ -15,14 +15,21 @@ import (
 
 type LineHandler func(runID int64, line string)
 
+// FinishHandler is invoked exactly once per run, after the run has reached a
+// terminal status (success/failed/cancelled) and all its logs have been
+// persisted. It's used to release resources scoped to the lifetime of a
+// single run, e.g. the WebSocket hub's per-run log buffer.
+type FinishHandler func(runID int64)
+
 type Engine struct {
-	db      *sql.DB
-	key     []byte
-	actBin  string
-	onLine  LineHandler
-	queue   chan queuedRun
-	mu      sync.Mutex
-	running map[int64]*exec.Cmd
+	db       *sql.DB
+	key      []byte
+	actBin   string
+	onLine   LineHandler
+	onFinish FinishHandler
+	queue    chan queuedRun
+	mu       sync.Mutex
+	running  map[int64]*exec.Cmd
 }
 
 type queuedRun struct {
@@ -30,14 +37,15 @@ type queuedRun struct {
 	req   RunRequest
 }
 
-func NewEngine(db *sql.DB, key []byte, actBin string, onLine LineHandler) *Engine {
+func NewEngine(db *sql.DB, key []byte, actBin string, onLine LineHandler, onFinish FinishHandler) *Engine {
 	e := &Engine{
-		db:      db,
-		key:     key,
-		actBin:  actBin,
-		onLine:  onLine,
-		queue:   make(chan queuedRun, 100),
-		running: map[int64]*exec.Cmd{},
+		db:       db,
+		key:      key,
+		actBin:   actBin,
+		onLine:   onLine,
+		onFinish: onFinish,
+		queue:    make(chan queuedRun, 100),
+		running:  map[int64]*exec.Cmd{},
 	}
 	go e.worker()
 	return e
@@ -170,6 +178,9 @@ func (e *Engine) runOne(runID int64, req RunRequest) {
 func (e *Engine) finish(runID int64, status RunStatus, started int64) {
 	finished := time.Now().Unix()
 	UpdateRunStatus(e.db, runID, status, &started, &finished)
+	if e.onFinish != nil {
+		e.onFinish(runID)
+	}
 }
 
 func (e *Engine) writeTempFiles(req RunRequest) (secretFile, varFile string, cleanup func(), err error) {
