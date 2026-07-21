@@ -6,10 +6,16 @@ export default function SecretsPanel({ repoPath }) {
   const [entries, setEntries] = useState([])
   const [name, setName] = useState('')
   const [value, setValue] = useState('')
+  const [error, setError] = useState(null)
 
   async function load() {
     if (!repoPath) return
-    setEntries(await api.listSecrets(repoPath, kind))
+    try {
+      setEntries(await api.listSecrets(repoPath, kind))
+      setError(null)
+    } catch (err) {
+      setError(err.message)
+    }
   }
 
   useEffect(() => {
@@ -17,15 +23,25 @@ export default function SecretsPanel({ repoPath }) {
   }, [repoPath, kind])
 
   async function save() {
-    await api.upsertSecret(repoPath, kind, name, value)
-    setName('')
-    setValue('')
-    load()
+    setError(null)
+    try {
+      await api.upsertSecret(repoPath, kind, name, value)
+      setName('')
+      setValue('')
+      load()
+    } catch (err) {
+      setError(err.message)
+    }
   }
 
   async function remove(key) {
-    await api.deleteSecret(repoPath, kind, key)
-    load()
+    setError(null)
+    try {
+      await api.deleteSecret(repoPath, kind, key)
+      load()
+    } catch (err) {
+      setError(err.message)
+    }
   }
 
   if (!repoPath) {
@@ -42,6 +58,7 @@ export default function SecretsPanel({ repoPath }) {
           <input type="radio" checked={kind === 'var'} onChange={() => setKind('var')} /> Vars
         </label>
       </div>
+      {error && <p className="error">{error}</p>}
       {entries.length === 0 ? (
         <p className="empty-state">No {kind === 'secret' ? 'secrets' : 'vars'} stored for this repo yet.</p>
       ) : (

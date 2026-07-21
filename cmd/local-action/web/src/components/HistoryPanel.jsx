@@ -22,10 +22,16 @@ function StatusChip({ status }) {
 export default function HistoryPanel({ repoPath, activeRunId }) {
   const [runs, setRuns] = useState([])
   const [selectedId, setSelectedId] = useState(activeRunId)
+  const [error, setError] = useState(null)
 
   async function load() {
     if (!repoPath) return
-    setRuns(await api.listRuns(repoPath))
+    try {
+      setRuns(await api.listRuns(repoPath))
+      setError(null)
+    } catch (err) {
+      setError(err.message)
+    }
   }
 
   useEffect(() => {
@@ -45,7 +51,8 @@ export default function HistoryPanel({ repoPath, activeRunId }) {
   return (
     <div className="row row--top">
       <ul className="run-list">
-        {runs.length === 0 && <p className="empty-state">No runs yet for this repo.</p>}
+        {error && <p className="error">{error}</p>}
+        {runs.length === 0 && !error && <p className="empty-state">No runs yet for this repo.</p>}
         {runs.map((run) => (
           <li
             key={run.id}

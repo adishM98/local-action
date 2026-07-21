@@ -8,6 +8,7 @@ export default function WorkflowsPanel({ repoPath, onRunStarted }) {
   const [error, setError] = useState(null)
   const [selections, setSelections] = useState({})
   const [copiedFile, setCopiedFile] = useState(null)
+  const [runError, setRunError] = useState(null)
 
   async function scan() {
     setError(null)
@@ -35,19 +36,28 @@ export default function WorkflowsPanel({ repoPath, onRunStarted }) {
   async function run(workflow) {
     const selection = selections[workflow.file]
     if (!selection) return
-    const { runId } = await api.createRun({
-      repoPath,
-      workflowFile: workflow.file,
-      event: selection.event,
-      inputs: selection.inputs,
-    })
-    onRunStarted(runId)
+    setRunError(null)
+    try {
+      const { runId } = await api.createRun({
+        repoPath,
+        workflowFile: workflow.file,
+        event: selection.event,
+        inputs: selection.inputs,
+      })
+      onRunStarted(runId)
+    } catch (err) {
+      setRunError({ file: workflow.file, message: err.message })
+    }
   }
 
   async function copyFile(file) {
-    await navigator.clipboard.writeText(file)
-    setCopiedFile(file)
-    setTimeout(() => setCopiedFile((current) => (current === file ? null : current)), 1500)
+    try {
+      await navigator.clipboard.writeText(file)
+      setCopiedFile(file)
+      setTimeout(() => setCopiedFile((current) => (current === file ? null : current)), 1500)
+    } catch (err) {
+      console.error('copy workflow file path failed:', err)
+    }
   }
 
   return (
@@ -98,6 +108,7 @@ export default function WorkflowsPanel({ repoPath, onRunStarted }) {
                     Run
                   </button>
                 </div>
+                {runError?.file === wf.file && <p className="error">{runError.message}</p>}
                 {selection.event === 'workflow_dispatch' &&
                   dispatchInputs.map((input) => (
                     <div className="row" key={input.name}>

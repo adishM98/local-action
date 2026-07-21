@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -99,7 +100,7 @@ func (e *Engine) runOne(runID int64, req RunRequest) {
 
 	secretFile, varFile, cleanup, err := e.writeTempFiles(req)
 	if err != nil {
-		e.finish(runID, StatusFailed, started)
+		e.failEarly(runID, started, fmt.Errorf("preparing secrets/vars for act: %w", err))
 		return
 	}
 	defer cleanup()
@@ -110,17 +111,17 @@ func (e *Engine) runOne(runID int64, req RunRequest) {
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		e.finish(runID, StatusFailed, started)
+		e.failEarly(runID, started, fmt.Errorf("opening act stdout: %w", err))
 		return
 	}
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		e.finish(runID, StatusFailed, started)
+		e.failEarly(runID, started, fmt.Errorf("opening act stderr: %w", err))
 		return
 	}
 
 	if err := cmd.Start(); err != nil {
-		e.finish(runID, StatusFailed, started)
+		e.failEarly(runID, started, fmt.Errorf("starting act (bin=%q): %w", e.actBin, err))
 		return
 	}
 
@@ -148,7 +149,9 @@ func (e *Engine) runOne(runID int64, req RunRequest) {
 			n := lineNo
 			lineMu.Unlock()
 			text := scanner.Text()
-			AppendRunLog(e.db, runID, n, text)
+			if err := AppendRunLog(e.db, runID, n, text); err != nil {
+				log.Printf("run %d: append log line %d: %v", runID, n, err)
+			}
 			if e.onLine != nil {
 				e.onLine(runID, text)
 			}
@@ -177,10 +180,27 @@ func (e *Engine) runOne(runID int64, req RunRequest) {
 
 func (e *Engine) finish(runID int64, status RunStatus, started int64) {
 	finished := time.Now().Unix()
-	UpdateRunStatus(e.db, runID, status, &started, &finished)
+	if err := UpdateRunStatus(e.db, runID, status, &started, &finished); err != nil {
+		log.Printf("run %d: update status to %s: %v", runID, status, err)
+	}
 	if e.onFinish != nil {
 		e.onFinish(runID)
 	}
+}
+
+// failEarly records why a run never got to the point of streaming act's own
+// output, so the log viewer shows a reason instead of an empty pane. Without
+// this, a missing act binary or a broken temp-file write left StatusFailed
+// with zero log lines and no way to tell what went wrong.
+func (e *Engine) failEarly(runID int64, started int64, cause error) {
+	message := "local-action: " + cause.Error()
+	if err := AppendRunLog(e.db, runID, 1, message); err != nil {
+		log.Printf("run %d: append early-failure log: %v", runID, err)
+	}
+	if e.onLine != nil {
+		e.onLine(runID, message)
+	}
+	e.finish(runID, StatusFailed, started)
 }
 
 func (e *Engine) writeTempFiles(req RunRequest) (secretFile, varFile string, cleanup func(), err error) {

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -110,6 +111,35 @@ func TestEngine_FailingRun(t *testing.T) {
 	}
 
 	waitForStatus(t, db, runID, StatusFailed)
+}
+
+func TestEngine_MissingActBinaryLeavesExplanationInLog(t *testing.T) {
+	dir := t.TempDir()
+
+	db, err := OpenDB(filepath.Join(dir, "test.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+
+	engine := NewEngine(db, make([]byte, keySize), filepath.Join(dir, "no-such-act-binary"), nil, nil)
+	runID, err := engine.Enqueue(RunRequest{RepoPath: dir, WorkflowFile: "wf.yml", Event: "push"})
+	if err != nil {
+		t.Fatalf("enqueue: %v", err)
+	}
+
+	waitForStatus(t, db, runID, StatusFailed)
+
+	logs, err := GetRunLogs(db, runID)
+	if err != nil {
+		t.Fatalf("get run logs: %v", err)
+	}
+	if len(logs) == 0 {
+		t.Fatal("expected an explanatory log line for a run that never started, got none")
+	}
+	if !strings.Contains(logs[0], "local-action:") || !strings.Contains(logs[0], "starting act") {
+		t.Fatalf("expected an explanatory 'local-action: ... starting act ...' line, got: %v", logs)
+	}
 }
 
 func TestEngine_RunsQueueSequentially(t *testing.T) {

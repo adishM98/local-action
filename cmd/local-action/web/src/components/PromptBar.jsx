@@ -54,9 +54,13 @@ export default function PromptBar({ repoPath, setRepoPath }) {
 
   async function copyPath() {
     if (!repoPath) return
-    await navigator.clipboard.writeText(repoPath)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
+    try {
+      await navigator.clipboard.writeText(repoPath)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch (err) {
+      console.error('copy repo path failed:', err)
+    }
   }
 
   return (
