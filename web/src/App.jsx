@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import WorkflowsPanel from './components/WorkflowsPanel.jsx'
+import SecretsPanel from './components/SecretsPanel.jsx'
 
 export default function App() {
   const [repoPath, setRepoPath] = useState(localStorage.getItem('repoPath') || '')
@@ -26,7 +27,7 @@ export default function App() {
       {tab === 'workflows' && (
         <WorkflowsPanel repoPath={repoPath} setRepoPath={updateRepoPath} onRunStarted={onRunStarted} />
       )}
-      {tab === 'secrets' && <p>Secrets panel placeholder — added in Task 11.</p>}
+      {tab === 'secrets' && <SecretsPanel repoPath={repoPath} />}
       {tab === 'history' && <p>History panel placeholder — added in Task 12.</p>}
     </div>
   )
