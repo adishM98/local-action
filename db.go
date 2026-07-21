@@ -40,6 +40,16 @@ func OpenDB(path string) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
+	// SQLite only supports one writer at a time; database/sql's default
+	// pool opens multiple connections and interleaves reads/writes across
+	// them, which surfaces as spurious SQLITE_BUSY errors under concurrent
+	// access (e.g. the act engine's run/log writers racing HTTP/test
+	// readers). Force a single connection so all access is serialized.
+	db.SetMaxOpenConns(1)
+	if _, err := db.Exec("PRAGMA busy_timeout = 5000"); err != nil {
+		db.Close()
+		return nil, err
+	}
 	if _, err := db.Exec(schema); err != nil {
 		db.Close()
 		return nil, err
