@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os/exec"
 	"strconv"
@@ -145,7 +146,11 @@ func NewRouter(db *sql.DB, key []byte, engine *Engine, hub *Hub, actBin string) 
 		}
 		run, err := GetRun(db, id)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
+			if errors.Is(err, sql.ErrNoRows) {
+				http.Error(w, "run not found", http.StatusNotFound)
+			} else {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
 			return
 		}
 		logs, err := GetRunLogs(db, id)

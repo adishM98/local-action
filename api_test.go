@@ -114,6 +114,28 @@ func TestAPI_ScanSecretsAndRunLifecycle(t *testing.T) {
 	}
 }
 
+func TestAPI_GetRun_NotFound(t *testing.T) {
+	stubDir := t.TempDir()
+	stubPath := filepath.Join(stubDir, "fake-act.sh")
+	if err := os.WriteFile(stubPath, []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
+		t.Fatalf("write stub: %v", err)
+	}
+
+	mux, _, _ := newTestRouter(t, stubPath)
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	// Try to get a run that doesn't exist
+	resp, err := http.Get(server.URL + "/api/runs/999")
+	if err != nil {
+		t.Fatalf("get non-existent run: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %v", resp.StatusCode)
+	}
+}
+
 func itoa(n int64) string {
 	return string(rune('0' + n%10)) // fine for single-digit run IDs in this small test DB
 }
