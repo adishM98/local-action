@@ -11,8 +11,9 @@ CREATE TABLE IF NOT EXISTS secrets (
   repo_path TEXT NOT NULL,
   kind TEXT NOT NULL,
   key TEXT NOT NULL,
+  workflow_file TEXT NOT NULL DEFAULT '',
   value_encrypted BLOB NOT NULL,
-  PRIMARY KEY (repo_path, kind, key)
+  PRIMARY KEY (repo_path, kind, key, workflow_file)
 );
 
 CREATE TABLE IF NOT EXISTS runs (
@@ -54,5 +55,40 @@ func OpenDB(path string) (*sql.DB, error) {
 		db.Close()
 		return nil, err
 	}
+	if err := migrateSecretsWorkflowFile(db); err != nil {
+		db.Close()
+		return nil, err
+	}
 	return db, nil
+}
+
+// migrateSecretsWorkflowFile upgrades a pre-workflow_file secrets table in
+// place. Old rows become repo-wide (workflow_file = ''). SQLite can't add a
+// column into an existing PRIMARY KEY, so we rebuild the table.
+func migrateSecretsWorkflowFile(db *sql.DB) error {
+	var count int
+	err := db.QueryRow(
+		`SELECT COUNT(*) FROM pragma_table_info('secrets') WHERE name = 'workflow_file'`,
+	).Scan(&count)
+	if err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+	_, err = db.Exec(`
+		ALTER TABLE secrets RENAME TO secrets_old;
+		CREATE TABLE secrets (
+		  repo_path TEXT NOT NULL,
+		  kind TEXT NOT NULL,
+		  key TEXT NOT NULL,
+		  workflow_file TEXT NOT NULL DEFAULT '',
+		  value_encrypted BLOB NOT NULL,
+		  PRIMARY KEY (repo_path, kind, key, workflow_file)
+		);
+		INSERT INTO secrets (repo_path, kind, key, workflow_file, value_encrypted)
+		  SELECT repo_path, kind, key, '', value_encrypted FROM secrets_old;
+		DROP TABLE secrets_old;
+	`)
+	return err
 }

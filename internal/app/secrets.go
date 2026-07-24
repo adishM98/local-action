@@ -23,8 +23,8 @@ func UpsertSecret(db *sql.DB, encKey []byte, repoPath string, kind SecretKind, n
 		return err
 	}
 	_, err = db.Exec(
-		`INSERT INTO secrets (repo_path, kind, key, value_encrypted) VALUES (?, ?, ?, ?)
-		 ON CONFLICT(repo_path, kind, key) DO UPDATE SET value_encrypted = excluded.value_encrypted`,
+		`INSERT INTO secrets (repo_path, kind, key, workflow_file, value_encrypted) VALUES (?, ?, ?, '', ?)
+		 ON CONFLICT(repo_path, kind, key, workflow_file) DO UPDATE SET value_encrypted = excluded.value_encrypted`,
 		repoPath, string(kind), name, ciphertext,
 	)
 	return err
