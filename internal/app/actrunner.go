@@ -99,14 +99,14 @@ func (e *Engine) worker() {
 func (e *Engine) runOne(runID int64, req RunRequest) {
 	started := time.Now().Unix()
 
-	secretFile, varFile, cleanup, err := e.writeTempFiles(req)
+	secretFile, varFile, envFile, cleanup, err := e.writeTempFiles(req)
 	if err != nil {
 		e.failEarly(runID, started, fmt.Errorf("preparing secrets/vars for act: %w", err))
 		return
 	}
 	defer cleanup()
 
-	argv := BuildArgv(req, secretFile, varFile)
+	argv := BuildArgv(req, secretFile, varFile, envFile)
 	cmd := exec.Command(e.actBin, argv...)
 	cmd.Dir = req.RepoPath
 
@@ -204,30 +204,39 @@ func (e *Engine) failEarly(runID int64, started int64, cause error) {
 	e.finish(runID, StatusFailed, started)
 }
 
-func (e *Engine) writeTempFiles(req RunRequest) (secretFile, varFile string, cleanup func(), err error) {
+func (e *Engine) writeTempFiles(req RunRequest) (secretFile, varFile, envFile string, cleanup func(), err error) {
 	secrets, err := SecretsForRun(e.db, e.key, req.RepoPath, req.WorkflowFile, KindSecret)
 	if err != nil {
-		return "", "", nil, err
+		return "", "", "", nil, err
 	}
 	vars, err := SecretsForRun(e.db, e.key, req.RepoPath, req.WorkflowFile, KindVar)
 	if err != nil {
-		return "", "", nil, err
+		return "", "", "", nil, err
 	}
 
 	sf, err := writeDotenvTemp("act-secrets-*.env", secrets, req.ExtraSecrets)
 	if err != nil {
-		return "", "", nil, err
+		return "", "", "", nil, err
 	}
 	vf, err := writeDotenvTemp("act-vars-*.env", vars, req.ExtraVars)
 	if err != nil {
 		os.Remove(sf)
-		return "", "", nil, err
+		return "", "", "", nil, err
+	}
+	// Explicitly empty --env-file so act never falls back to auto-loading
+	// a ".env" from its working directory (the target repo itself).
+	ef, err := writeDotenvTemp("act-empty-*.env", nil, nil)
+	if err != nil {
+		os.Remove(sf)
+		os.Remove(vf)
+		return "", "", "", nil, err
 	}
 	cleanup = func() {
 		os.Remove(sf)
 		os.Remove(vf)
+		os.Remove(ef)
 	}
-	return sf, vf, cleanup, nil
+	return sf, vf, ef, cleanup, nil
 }
 
 func writeDotenvTemp(pattern string, values, extra map[string]string) (string, error) {

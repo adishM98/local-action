@@ -14,8 +14,16 @@ type RunRequest struct {
 	ExtraVars    map[string]string `json:"extraVars"`
 }
 
-func BuildArgv(req RunRequest, secretFile, varFile string) []string {
-	argv := []string{req.Event, "-W", req.WorkflowFile, "--json", "--secret-file", secretFile, "--var-file", varFile}
+// BuildArgv always sets --env-file explicitly (envFile should be an empty
+// file local-action controls) so act never falls back to auto-loading a
+// ".env" from its working directory — which is the target repo itself.
+// Letting that happen would mix uncontrolled repo secrets into the run and,
+// on any parse error, dump that file's full contents into the log.
+func BuildArgv(req RunRequest, secretFile, varFile, envFile string) []string {
+	argv := []string{
+		req.Event, "-W", req.WorkflowFile, "--json",
+		"--secret-file", secretFile, "--var-file", varFile, "--env-file", envFile,
+	}
 
 	keys := make([]string, 0, len(req.Inputs))
 	for k := range req.Inputs {

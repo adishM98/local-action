@@ -51,6 +51,61 @@ func TestEngine_SuccessfulRun(t *testing.T) {
 	}
 }
 
+// TestEngine_NeverAutoLoadsRepoDotenv guards against a real incident: act
+// defaults to reading ".env" from its working directory (cmd.Dir =
+// req.RepoPath) when --env-file isn't given. That silently mixed a real
+// repo's secrets into runs and, on any parse error, dumped the whole file
+// into the log. BuildArgv must always pass an explicit, empty --env-file so
+// a genuine .env sitting in the target repo is never read by act.
+func TestEngine_NeverAutoLoadsRepoDotenv(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("REAL_REPO_SECRET=leaked-value\n"), 0644); err != nil {
+		t.Fatalf("write repo .env: %v", err)
+	}
+	stub := writeStub(t, dir, "fake-act-envfile.sh", `#!/bin/sh
+prev=""
+for arg in "$@"; do
+  if [ "$prev" = "--env-file" ]; then
+    echo "ENVFILE_START"
+    cat "$arg"
+    echo "ENVFILE_END"
+  fi
+  prev="$arg"
+done
+exit 0
+`)
+
+	db, err := OpenDB(filepath.Join(dir, "test.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+
+	var mu sync.Mutex
+	var lines []string
+	engine := NewEngine(db, make([]byte, keySize), stub, func(runID int64, line string) {
+		mu.Lock()
+		defer mu.Unlock()
+		lines = append(lines, line)
+	}, nil)
+
+	runID, err := engine.Enqueue(RunRequest{RepoPath: dir, WorkflowFile: "wf.yml", Event: "push"})
+	if err != nil {
+		t.Fatalf("enqueue: %v", err)
+	}
+	waitForStatus(t, db, runID, StatusSuccess)
+
+	mu.Lock()
+	defer mu.Unlock()
+	joined := strings.Join(lines, "\n")
+	if strings.Contains(joined, "REAL_REPO_SECRET") || strings.Contains(joined, "leaked-value") {
+		t.Fatalf("real repo .env content leaked into run output: %v", lines)
+	}
+	if !strings.Contains(joined, "ENVFILE_START\nENVFILE_END") {
+		t.Fatalf("expected --env-file to point at an empty file, got: %v", lines)
+	}
+}
+
 // TestEngine_OnFinishCalledOnceAfterTerminalStatus guards the wiring used to
 // free the WebSocket hub's per-run buffer (Hub.Forget): onFinish must fire
 // exactly once per run, and only after the run's status is already terminal
