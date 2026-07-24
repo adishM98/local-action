@@ -44,6 +44,7 @@ export default function RunsView({ repoPath, workflows, workflowFile, health, on
         <h2>{workflow ? workflow.name : 'All workflows'}</h2>
         {workflow && !workflow.parseError && (
           <RunWorkflowMenu
+            key={workflow.file}
             repoPath={repoPath}
             workflow={workflow}
             onStarted={onOpenRun}
