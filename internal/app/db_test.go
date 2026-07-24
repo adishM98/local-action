@@ -88,3 +88,50 @@ func TestOpenDB_MigratesOldSecretsSchema(t *testing.T) {
 	}
 	db2.Close()
 }
+
+func TestOpenDB_MigratesOldRunsSchemaAddsBranchAndCommit(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "old.db")
+
+	old, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatalf("open raw: %v", err)
+	}
+	if _, err := old.Exec(`
+		CREATE TABLE runs (
+		  id INTEGER PRIMARY KEY AUTOINCREMENT,
+		  repo_path TEXT NOT NULL,
+		  workflow_file TEXT NOT NULL,
+		  event TEXT NOT NULL,
+		  inputs TEXT NOT NULL DEFAULT '{}',
+		  status TEXT NOT NULL,
+		  started_at INTEGER,
+		  finished_at INTEGER,
+		  created_at INTEGER NOT NULL
+		);
+		INSERT INTO runs (repo_path, workflow_file, event, status, created_at) VALUES ('/repo/a', 'ci.yml', 'push', 'success', 100);
+	`); err != nil {
+		t.Fatalf("seed old schema: %v", err)
+	}
+	old.Close()
+
+	db, err := OpenDB(path)
+	if err != nil {
+		t.Fatalf("open with migration: %v", err)
+	}
+	defer db.Close()
+
+	var branch, sha string
+	if err := db.QueryRow(`SELECT branch, commit_sha FROM runs WHERE repo_path = '/repo/a'`).Scan(&branch, &sha); err != nil {
+		t.Fatalf("query migrated row: %v", err)
+	}
+	if branch != "" || sha != "" {
+		t.Fatalf("expected empty defaults for a pre-existing row, got branch=%q sha=%q", branch, sha)
+	}
+
+	db.Close()
+	db2, err := OpenDB(path)
+	if err != nil {
+		t.Fatalf("re-open after migration: %v", err)
+	}
+	db2.Close()
+}

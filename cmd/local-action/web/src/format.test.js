@@ -75,6 +75,14 @@ test('filterRuns: status and event filters combine with search (AND)', () => {
   assert.deepEqual(filterRuns(runs, { search: '', status: 'success', event: 'push' }, nameFor), [runs[0]])
 })
 
+test('filterRuns: branch filter', () => {
+  const runs = [
+    { id: 1, workflowFile: 'ci.yml', event: 'push', status: 'success', branch: 'main' },
+    { id: 2, workflowFile: 'ci.yml', event: 'push', status: 'success', branch: 'feature/x' },
+  ]
+  assert.deepEqual(filterRuns(runs, { search: '', status: '', event: '', branch: 'main' }, nameFor), [runs[0]])
+})
+
 test('formatDurationMs: null/undefined renders empty', () => {
   assert.equal(formatDurationMs(null), '')
   assert.equal(formatDurationMs(undefined), '')

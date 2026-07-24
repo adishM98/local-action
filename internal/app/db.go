@@ -25,7 +25,9 @@ CREATE TABLE IF NOT EXISTS runs (
   status TEXT NOT NULL,
   started_at INTEGER,
   finished_at INTEGER,
-  created_at INTEGER NOT NULL
+  created_at INTEGER NOT NULL,
+  branch TEXT NOT NULL DEFAULT '',
+  commit_sha TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS run_logs (
@@ -73,7 +75,35 @@ func OpenDB(path string) (*sql.DB, error) {
 		db.Close()
 		return nil, err
 	}
+	if err := migrateRunsBranchCommit(db); err != nil {
+		db.Close()
+		return nil, err
+	}
 	return db, nil
+}
+
+// migrateRunsBranchCommit adds branch/commit_sha to a pre-existing runs
+// table. Unlike migrateSecretsWorkflowFile, these columns aren't part of a
+// primary key, so a plain ADD COLUMN suffices — no table rebuild needed.
+// Each column is checked and added independently (rather than gating both
+// on one sentinel check) so a crash between the two ALTERs can't leave one
+// column permanently missing on restart.
+func migrateRunsBranchCommit(db *sql.DB) error {
+	for _, col := range []string{"branch", "commit_sha"} {
+		var count int
+		if err := db.QueryRow(
+			`SELECT COUNT(*) FROM pragma_table_info('runs') WHERE name = ?`, col,
+		).Scan(&count); err != nil {
+			return err
+		}
+		if count > 0 {
+			continue
+		}
+		if _, err := db.Exec(`ALTER TABLE runs ADD COLUMN ` + col + ` TEXT NOT NULL DEFAULT ''`); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // migrateSecretsWorkflowFile upgrades a pre-workflow_file secrets table in

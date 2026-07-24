@@ -68,11 +68,12 @@ export function computeRunStats(runs) {
 // workflow name / event / "#<id>" / status, case-insensitively; status and
 // event narrow further (empty string = no restriction). resolveName maps a
 // run's workflowFile to its display name (workflows aren't embedded in Run).
-export function filterRuns(runs, { search, status, event }, resolveName) {
+export function filterRuns(runs, { search, status, event, branch }, resolveName) {
   const q = search.trim().toLowerCase()
   return runs.filter((run) => {
     if (status && run.status !== status) return false
     if (event && run.event !== event) return false
+    if (branch && run.branch !== branch) return false
     if (!q) return true
     const haystack = `${resolveName(run)} ${run.event} #${run.id} ${run.status}`.toLowerCase()
     return haystack.includes(q)

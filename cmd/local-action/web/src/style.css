@@ -209,6 +209,16 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   margin-bottom: 24px;
 }
 
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.pagination__summary { flex: 1; }
+
 .toolbar { display: flex; gap: 10px; margin-bottom: 16px; }
 .toolbar__search {
   flex: 1;

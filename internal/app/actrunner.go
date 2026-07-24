@@ -65,6 +65,7 @@ func encodeInputs(m map[string]string) string {
 }
 
 func (e *Engine) Enqueue(req RunRequest) (int64, error) {
+	branch, sha := gitInfo(req.RepoPath)
 	runID, err := CreateRun(e.db, Run{
 		RepoPath:     req.RepoPath,
 		WorkflowFile: req.WorkflowFile,
@@ -72,6 +73,8 @@ func (e *Engine) Enqueue(req RunRequest) (int64, error) {
 		Inputs:       encodeInputs(req.Inputs),
 		Status:       StatusQueued,
 		CreatedAt:    time.Now().Unix(),
+		Branch:       branch,
+		CommitSHA:    sha,
 	})
 	if err != nil {
 		return 0, err

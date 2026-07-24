@@ -22,6 +22,8 @@ func TestRuns_CreateGetUpdateList(t *testing.T) {
 		Inputs:       "{}",
 		Status:       StatusQueued,
 		CreatedAt:    now,
+		Branch:       "main",
+		CommitSHA:    "abc1234",
 	})
 	if err != nil {
 		t.Fatalf("create run: %v", err)
@@ -33,6 +35,9 @@ func TestRuns_CreateGetUpdateList(t *testing.T) {
 	}
 	if run.Status != StatusQueued || run.WorkflowFile != ".github/workflows/ci.yml" {
 		t.Fatalf("unexpected run: %+v", run)
+	}
+	if run.Branch != "main" || run.CommitSHA != "abc1234" {
+		t.Fatalf("expected branch/commitSha to round-trip, got %+v", run)
 	}
 
 	started := time.Now().Unix()

@@ -6,6 +6,7 @@ import { relativeTime, duration, formatDurationMs, computeRunStats, filterRuns }
 
 const STATUS_OPTIONS = ['success', 'failed', 'running', 'queued', 'cancelled']
 const STATUS_LABEL = { success: 'Passed', failed: 'Failed', running: 'Running', queued: 'Queued', cancelled: 'Cancelled' }
+const PAGE_SIZE = 25
 
 export default function RunsView({ repoPath, workflows, workflowFile, health, onOpenRun, onOpenSecrets }) {
   const [runs, setRuns] = useState([])
@@ -13,6 +14,8 @@ export default function RunsView({ repoPath, workflows, workflowFile, health, on
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [eventFilter, setEventFilter] = useState('')
+  const [branchFilter, setBranchFilter] = useState('')
+  const [page, setPage] = useState(1)
 
   useEffect(() => {
     if (!repoPath) return
@@ -36,6 +39,10 @@ export default function RunsView({ repoPath, workflows, workflowFile, health, on
     }
   }, [repoPath])
 
+  useEffect(() => {
+    setPage(1)
+  }, [workflowFile, search, statusFilter, eventFilter, branchFilter])
+
   if (!repoPath) {
     return <p className="empty-state">Enter a repo path above to get started.</p>
   }
@@ -44,7 +51,15 @@ export default function RunsView({ repoPath, workflows, workflowFile, health, on
   const visible = workflowFile ? runs.filter((r) => r.workflowFile === workflowFile) : runs
   const wfName = (file) => workflows.find((w) => w.file === file)?.name || file
   const events = [...new Set(visible.map((r) => r.event))].sort()
-  const filtered = filterRuns(visible, { search, status: statusFilter, event: eventFilter }, (r) => wfName(r.workflowFile))
+  const branches = [...new Set(visible.map((r) => r.branch).filter(Boolean))].sort()
+  const filtered = filterRuns(
+    visible,
+    { search, status: statusFilter, event: eventFilter, branch: branchFilter },
+    (r) => wfName(r.workflowFile),
+  )
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const pageStart = (page - 1) * PAGE_SIZE
+  const paged = filtered.slice(pageStart, pageStart + PAGE_SIZE)
 
   return (
     <div className="runs-view">
@@ -90,12 +105,22 @@ export default function RunsView({ repoPath, workflows, workflowFile, health, on
               </option>
             ))}
           </select>
+          {branches.length > 0 && (
+            <select value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)}>
+              <option value="">All branches</option>
+              {branches.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       )}
       <div className="run-rows">
         {visible.length === 0 && !error && <p className="empty-state">No runs yet.</p>}
         {visible.length > 0 && filtered.length === 0 && <p className="empty-state">No runs match these filters.</p>}
-        {filtered.map((run) => (
+        {paged.map((run) => (
           <button key={run.id} className="run-row" onClick={() => onOpenRun(run.id)}>
             <StatusBadge status={run.status} />
             <span className="run-row__main">
@@ -103,13 +128,30 @@ export default function RunsView({ repoPath, workflows, workflowFile, health, on
                 {wfName(run.workflowFile)} #{run.id}
               </span>
               <span className="run-row__meta">
-                {run.event} · {relativeTime(run.createdAt)}
+                {run.event}
+                {run.branch && ` · ${run.branch}`} · {relativeTime(run.createdAt)}
               </span>
             </span>
             <span className="run-row__duration">{duration(run)}</span>
           </button>
         ))}
       </div>
+      {filtered.length > PAGE_SIZE && (
+        <div className="pagination">
+          <span className="pagination__summary">
+            Showing {pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, filtered.length)} of {filtered.length}
+          </span>
+          <button className="btn" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+            ← Previous
+          </button>
+          <span className="pagination__page">
+            Page {page} of {totalPages}
+          </span>
+          <button className="btn" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+            Next →
+          </button>
+        </div>
+      )}
     </div>
   )
 }

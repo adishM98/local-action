@@ -24,12 +24,14 @@ type Run struct {
 	StartedAt    sql.NullInt64 `json:"startedAt"`
 	FinishedAt   sql.NullInt64 `json:"finishedAt"`
 	CreatedAt    int64         `json:"createdAt"`
+	Branch       string        `json:"branch"`
+	CommitSHA    string        `json:"commitSha"`
 }
 
 func CreateRun(db *sql.DB, r Run) (int64, error) {
 	res, err := db.Exec(
-		`INSERT INTO runs (repo_path, workflow_file, event, inputs, status, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
-		r.RepoPath, r.WorkflowFile, r.Event, r.Inputs, string(r.Status), r.CreatedAt,
+		`INSERT INTO runs (repo_path, workflow_file, event, inputs, status, created_at, branch, commit_sha) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		r.RepoPath, r.WorkflowFile, r.Event, r.Inputs, string(r.Status), r.CreatedAt, r.Branch, r.CommitSHA,
 	)
 	if err != nil {
 		return 0, err
@@ -75,16 +77,16 @@ func GetRun(db *sql.DB, id int64) (Run, error) {
 	var r Run
 	var status string
 	err := db.QueryRow(
-		`SELECT id, repo_path, workflow_file, event, inputs, status, started_at, finished_at, created_at FROM runs WHERE id = ?`,
+		`SELECT id, repo_path, workflow_file, event, inputs, status, started_at, finished_at, created_at, branch, commit_sha FROM runs WHERE id = ?`,
 		id,
-	).Scan(&r.ID, &r.RepoPath, &r.WorkflowFile, &r.Event, &r.Inputs, &status, &r.StartedAt, &r.FinishedAt, &r.CreatedAt)
+	).Scan(&r.ID, &r.RepoPath, &r.WorkflowFile, &r.Event, &r.Inputs, &status, &r.StartedAt, &r.FinishedAt, &r.CreatedAt, &r.Branch, &r.CommitSHA)
 	r.Status = RunStatus(status)
 	return r, err
 }
 
 func ListRuns(db *sql.DB, repoPath string) ([]Run, error) {
 	rows, err := db.Query(
-		`SELECT id, repo_path, workflow_file, event, inputs, status, started_at, finished_at, created_at FROM runs WHERE repo_path = ? ORDER BY created_at DESC`,
+		`SELECT id, repo_path, workflow_file, event, inputs, status, started_at, finished_at, created_at, branch, commit_sha FROM runs WHERE repo_path = ? ORDER BY created_at DESC`,
 		repoPath,
 	)
 	if err != nil {
@@ -96,7 +98,7 @@ func ListRuns(db *sql.DB, repoPath string) ([]Run, error) {
 	for rows.Next() {
 		var r Run
 		var status string
-		if err := rows.Scan(&r.ID, &r.RepoPath, &r.WorkflowFile, &r.Event, &r.Inputs, &status, &r.StartedAt, &r.FinishedAt, &r.CreatedAt); err != nil {
+		if err := rows.Scan(&r.ID, &r.RepoPath, &r.WorkflowFile, &r.Event, &r.Inputs, &status, &r.StartedAt, &r.FinishedAt, &r.CreatedAt, &r.Branch, &r.CommitSHA); err != nil {
 			return nil, err
 		}
 		r.Status = RunStatus(status)

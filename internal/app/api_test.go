@@ -398,6 +398,47 @@ func TestAPI_WorkflowCategories_SaveAndGet(t *testing.T) {
 	}
 }
 
+func TestAPI_CreateRun_CapturesBranchAndCommitFromRealGitRepo(t *testing.T) {
+	repoDir := t.TempDir()
+	runGit(t, repoDir, "init", "-b", "feature/foo")
+	runGit(t, repoDir, "commit", "--allow-empty", "-m", "initial")
+	if err := os.MkdirAll(filepath.Join(repoDir, ".github", "workflows"), 0755); err != nil {
+		t.Fatalf("mkdir workflows: %v", err)
+	}
+
+	stubDir := t.TempDir()
+	stubPath := filepath.Join(stubDir, "fake-act.sh")
+	if err := os.WriteFile(stubPath, []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
+		t.Fatalf("write stub: %v", err)
+	}
+	mux, db, _ := newTestRouter(t, stubPath)
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	body, _ := json.Marshal(map[string]string{"repoPath": repoDir, "workflowFile": "ci.yml", "event": "push"})
+	resp, err := http.Post(server.URL+"/api/runs", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("create run: %v", err)
+	}
+	var created struct {
+		RunID int64 `json:"runId"`
+	}
+	json.NewDecoder(resp.Body).Decode(&created)
+	resp.Body.Close()
+
+	waitForStatus(t, db, created.RunID, StatusSuccess)
+	run, err := GetRun(db, created.RunID)
+	if err != nil {
+		t.Fatalf("get run: %v", err)
+	}
+	if run.Branch != "feature/foo" {
+		t.Errorf("branch: got %q, want feature/foo", run.Branch)
+	}
+	if len(run.CommitSHA) < 7 {
+		t.Errorf("commitSha: got %q, expected a short hash", run.CommitSHA)
+	}
+}
+
 func TestTruncateTail(t *testing.T) {
 	if got := truncateTail("short", 300); got != "short" {
 		t.Fatalf("short string changed: %q", got)

@@ -126,7 +126,9 @@ export default function RunDetail({ runId, onBack, onOpenRun }) {
         <h2>{run ? `${run.workflowFile} #${run.id}` : `Run #${runId}`}</h2>
         {run && (
           <span className="run-detail__meta">
-            {run.event} · {relativeTime(run.createdAt)}
+            {run.event}
+            {run.branch && ` · ${run.branch}`}
+            {run.commitSha && ` (${run.commitSha})`} · {relativeTime(run.createdAt)}
             {duration(run) && ` · ${duration(run)}`}
           </span>
         )}
