@@ -117,6 +117,124 @@ jobs:
 	}
 }
 
+func TestParseWorkflowFile_AutoDetectsEventPayloadFromSimpleIfCondition(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", `name: CI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  build:
+    if: ${{ github.event.action == 'labeled' && github.event.label.name == 'run-ci' }}
+    runs-on: ubuntu-latest
+    steps: []
+`)
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	wf := workflows[0]
+	want := `{"action":"labeled","label":{"name":"run-ci"}}`
+	if wf.AutoEventPayload != want {
+		t.Errorf("got %q, want %q", wf.AutoEventPayload, want)
+	}
+}
+
+func TestParseWorkflowFile_AutoDetectSupportsDoubleQuotedLiterals(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", `name: CI
+on: push
+jobs:
+  build:
+    if: ${{ github.event.action == "opened" }}
+    runs-on: ubuntu-latest
+    steps: []
+`)
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	want := `{"action":"opened"}`
+	if workflows[0].AutoEventPayload != want {
+		t.Errorf("got %q, want %q", workflows[0].AutoEventPayload, want)
+	}
+}
+
+func TestParseWorkflowFile_NoAutoPayloadWhenIfIsComplex(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", `name: CI
+on: push
+jobs:
+  build:
+    if: ${{ github.event.action == 'labeled' || github.event.action == 'synchronize' }}
+    runs-on: ubuntu-latest
+    steps: []
+`)
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	if workflows[0].AutoEventPayload != "" {
+		t.Errorf("expected no auto payload for an || condition, got %q", workflows[0].AutoEventPayload)
+	}
+}
+
+func TestParseWorkflowFile_NoAutoPayloadWhenNoIfCondition(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", "name: CI\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps: []\n")
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	if workflows[0].AutoEventPayload != "" {
+		t.Errorf("expected no auto payload without an if: condition, got %q", workflows[0].AutoEventPayload)
+	}
+}
+
+func TestParseWorkflowFile_AutoPayloadSkipsNonEventComparisons(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", `name: CI
+on: push
+jobs:
+  build:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    steps: []
+`)
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	if workflows[0].AutoEventPayload != "" {
+		t.Errorf("expected no auto payload for a non github.event.* comparison, got %q", workflows[0].AutoEventPayload)
+	}
+}
+
+func TestParseWorkflowFile_AutoPayloadUsesFirstSolvableJob(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", `name: CI
+on: push
+jobs:
+  unsolvable:
+    if: ${{ github.event.action == 'labeled' || github.event.action == 'x' }}
+    runs-on: ubuntu-latest
+    steps: []
+  solvable:
+    if: ${{ github.event.action == 'opened' }}
+    runs-on: ubuntu-latest
+    steps: []
+`)
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	want := `{"action":"opened"}`
+	if workflows[0].AutoEventPayload != want {
+		t.Errorf("got %q, want %q", workflows[0].AutoEventPayload, want)
+	}
+}
+
 func TestScanWorkflows_StringEvent(t *testing.T) {
 	repo := t.TempDir()
 	writeWorkflow(t, repo, "ci.yml", "name: CI\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps: []\n")

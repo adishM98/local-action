@@ -11,6 +11,7 @@ export default function RunWorkflowMenu({ repoPath, workflow, onStarted, onOpenS
   const [payloadOpen, setPayloadOpen] = useState(false)
   const [payload, setPayload] = useState('')
   const [payloadError, setPayloadError] = useState(null)
+  const [autoDetected, setAutoDetected] = useState(false)
   const ref = useRef(null)
 
   useEffect(() => {
@@ -33,11 +34,26 @@ export default function RunWorkflowMenu({ repoPath, workflow, onStarted, onOpenS
       .catch(() => setCounts(null))
   }, [open, repoPath, workflow.file])
 
+  // No saved payload yet? Fall back to the workflow's auto-detected one
+  // (derived server-side from a solvable if: condition) so a labeled/PR-
+  // gated job just runs, instead of requiring the user to hand-write JSON.
   useEffect(() => {
     if (!open) return
     api
       .getEventPayload(repoPath, workflow.file)
-      .then((result) => setPayload(result?.payload || ''))
+      .then((result) => {
+        const saved = result?.payload || ''
+        if (saved) {
+          setPayload(saved)
+          setAutoDetected(false)
+        } else if (workflow.autoEventPayload) {
+          setPayload(workflow.autoEventPayload)
+          setAutoDetected(true)
+        } else {
+          setPayload('')
+          setAutoDetected(false)
+        }
+      })
       .catch(() => setPayload(''))
   }, [open, repoPath, workflow.file])
 
@@ -133,9 +149,14 @@ export default function RunWorkflowMenu({ repoPath, workflow, onStarted, onOpenS
                   onChange={(e) => {
                     setPayload(e.target.value)
                     setPayloadError(null)
+                    setAutoDetected(false)
                   }}
                 />
-                <small>Fills github.event.* so if: conditions gated on event data can run locally.</small>
+                <small>
+                  {autoDetected
+                    ? "Auto-detected from this workflow's if: condition — edit or clear for a different scenario."
+                    : 'Fills github.event.* so if: conditions gated on event data can run locally.'}
+                </small>
                 {payloadError && <p className="error">{payloadError}</p>}
               </div>
             )}

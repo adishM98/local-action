@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -13,13 +14,14 @@ import (
 )
 
 type WorkflowInfo struct {
-	File           string          `json:"file"`
-	Name           string          `json:"name"`
-	Events         []string        `json:"events"`
-	DispatchInputs []DispatchInput `json:"dispatchInputs,omitempty"`
-	UsedSecrets    []string        `json:"usedSecrets,omitempty"`
-	UsedVars       []string        `json:"usedVars,omitempty"`
-	ParseError     string          `json:"parseError,omitempty"`
+	File             string          `json:"file"`
+	Name             string          `json:"name"`
+	Events           []string        `json:"events"`
+	DispatchInputs   []DispatchInput `json:"dispatchInputs,omitempty"`
+	UsedSecrets      []string        `json:"usedSecrets,omitempty"`
+	UsedVars         []string        `json:"usedVars,omitempty"`
+	AutoEventPayload string          `json:"autoEventPayload,omitempty"`
+	ParseError       string          `json:"parseError,omitempty"`
 }
 
 var (
@@ -117,7 +119,7 @@ func ParseWorkflowFile(path string) (WorkflowInfo, error) {
 		return info, nil
 	}
 
-	var onNode *yaml.Node
+	var onNode, jobsNode *yaml.Node
 	for i := 0; i < len(root.Content); i += 2 {
 		keyNode := root.Content[i]
 		valNode := root.Content[i+1]
@@ -128,7 +130,13 @@ func ParseWorkflowFile(path string) (WorkflowInfo, error) {
 			}
 		case "on":
 			onNode = valNode
+		case "jobs":
+			jobsNode = valNode
 		}
+	}
+
+	if jobsNode != nil {
+		info.AutoEventPayload = autoEventPayloadFromJobs(jobsNode)
 	}
 
 	if onNode == nil {
@@ -170,6 +178,82 @@ func parseOnNode(n *yaml.Node) ([]string, []DispatchInput, error) {
 		return nil, nil, fmt.Errorf("unsupported 'on' node kind: %v", n.Kind)
 	}
 	return events, dispatchInputs, nil
+}
+
+var ifClauseRe = regexp.MustCompile(`^github\.event\.([A-Za-z0-9_.]+)\s*==\s*(?:'([^']*)'|"([^"]*)")$`)
+
+// autoEventPayloadFromJobs scans each job's if: condition for the first one
+// that reduces to a plain conjunction of github.event.<path> == '<value>'
+// clauses, and returns the matching JSON payload (act's -e/--eventpath
+// shape) so the condition evaluates true without the user hand-writing it.
+// Conditions using ||, negation, function calls, or comparisons against
+// anything other than github.event.* are left alone — job.if is simply not
+// auto-solvable, and the user can still supply a payload manually.
+func autoEventPayloadFromJobs(jobsNode *yaml.Node) string {
+	if jobsNode.Kind != yaml.MappingNode {
+		return ""
+	}
+	for i := 0; i < len(jobsNode.Content); i += 2 {
+		jobNode := jobsNode.Content[i+1]
+		if jobNode.Kind != yaml.MappingNode {
+			continue
+		}
+		for j := 0; j < len(jobNode.Content); j += 2 {
+			if jobNode.Content[j].Value != "if" {
+				continue
+			}
+			ifValue := jobNode.Content[j+1]
+			if ifValue.Kind != yaml.ScalarNode {
+				continue
+			}
+			if payload, ok := solveIfCondition(ifValue.Value); ok {
+				return payload
+			}
+		}
+	}
+	return ""
+}
+
+func solveIfCondition(cond string) (string, bool) {
+	cond = strings.TrimSpace(cond)
+	cond = strings.TrimPrefix(cond, "${{")
+	cond = strings.TrimSuffix(cond, "}}")
+	cond = strings.TrimSpace(cond)
+	if cond == "" || strings.Contains(cond, "||") || strings.Contains(cond, "!") {
+		return "", false
+	}
+
+	root := map[string]any{}
+	for _, clause := range strings.Split(cond, "&&") {
+		m := ifClauseRe.FindStringSubmatch(strings.TrimSpace(clause))
+		if m == nil {
+			return "", false
+		}
+		value := m[2]
+		if value == "" && m[3] != "" {
+			value = m[3]
+		}
+		setNestedPath(root, strings.Split(m[1], "."), value)
+	}
+
+	b, err := json.Marshal(root)
+	if err != nil {
+		return "", false
+	}
+	return string(b), true
+}
+
+func setNestedPath(root map[string]any, path []string, value string) {
+	node := root
+	for _, key := range path[:len(path)-1] {
+		next, ok := node[key].(map[string]any)
+		if !ok {
+			next = map[string]any{}
+			node[key] = next
+		}
+		node = next
+	}
+	node[path[len(path)-1]] = value
 }
 
 func parseDispatchInputs(n *yaml.Node) []DispatchInput {

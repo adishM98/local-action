@@ -26,10 +26,17 @@ type RunRequest struct {
 // event context (e.g. a labeled-PR trigger) can evaluate true locally.
 // Omitted entirely when empty, matching today's argv for every workflow
 // that doesn't need it.
+//
+// --container-architecture linux/amd64 is always forced: GitHub's own
+// ubuntu-latest runners are x64, but act defaults to the host's native
+// architecture otherwise — on Apple Silicon that's arm64, which silently
+// diverges from real CI (some native npm packages refuse to build on
+// arm64 even though they work fine on GitHub's actual x64 runners).
 func BuildArgv(req RunRequest, secretFile, varFile, envFile, eventPayloadFile string) []string {
 	argv := []string{
 		req.Event, "-W", req.WorkflowFile, "--json",
 		"--secret-file", secretFile, "--var-file", varFile, "--env-file", envFile,
+		"--container-architecture", "linux/amd64",
 	}
 	if eventPayloadFile != "" {
 		argv = append(argv, "-e", eventPayloadFile)
