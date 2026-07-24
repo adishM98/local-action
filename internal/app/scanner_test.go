@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -143,5 +144,32 @@ func TestScanWorkflows_PathDoesNotExist(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "does not exist") {
 		t.Fatalf("expected a clear 'does not exist' error, got: %v", err)
+	}
+}
+
+func TestScanWorkflows_EmptyResultsMarshalAsEmptyArray(t *testing.T) {
+	// No workflows dir at all.
+	repo := t.TempDir()
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	b, _ := json.Marshal(workflows)
+	if string(b) != "[]" {
+		t.Fatalf("no-dir case: expected [], got %s", b)
+	}
+
+	// Empty workflows dir.
+	repo2 := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(repo2, ".github", "workflows"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	workflows, err = ScanWorkflows(repo2)
+	if err != nil {
+		t.Fatalf("scan empty dir: %v", err)
+	}
+	b, _ = json.Marshal(workflows)
+	if string(b) != "[]" {
+		t.Fatalf("empty-dir case: expected [], got %s", b)
 	}
 }

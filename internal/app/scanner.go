@@ -42,13 +42,13 @@ func ScanWorkflows(repoPath string) ([]WorkflowInfo, error) {
 	dir := filepath.Join(repoPath, ".github", "workflows")
 	entries, err := os.ReadDir(dir)
 	if errors.Is(err, os.ErrNotExist) {
-		return nil, nil
+		return []WorkflowInfo{}, nil
 	}
 	if err != nil {
 		return nil, err
 	}
 
-	var results []WorkflowInfo
+	results := []WorkflowInfo{}
 	for _, e := range entries {
 		if e.IsDir() {
 			continue
