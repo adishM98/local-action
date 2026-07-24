@@ -28,6 +28,7 @@ function HealthDot({ label, ok, error, onClick }) {
 
 export default function TopBar({ repoPath, onCommit, health, onRecheck }) {
   const [draft, setDraft] = useState(repoPath)
+  const [focused, setFocused] = useState(false)
   const recentPaths = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]')
 
   function commit() {
@@ -40,17 +41,24 @@ export default function TopBar({ repoPath, onCommit, health, onRecheck }) {
 
   return (
     <header className="top-bar">
-      <span className="top-bar__logo">local-action</span>
-      <input
-        className="top-bar__path"
-        list="recent-repo-paths"
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => e.key === 'Enter' && commit()}
-        placeholder="/path/to/repo"
-        spellCheck={false}
-      />
+      <span className="top-bar__logo">local-action:~$</span>
+      <div className="top-bar__path-wrap">
+        <input
+          className="top-bar__path"
+          list="recent-repo-paths"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => {
+            setFocused(false)
+            commit()
+          }}
+          onKeyDown={(e) => e.key === 'Enter' && commit()}
+          placeholder="/path/to/repo"
+          spellCheck={false}
+        />
+        {focused && <span className="top-bar__cursor" aria-hidden="true" />}
+      </div>
       <datalist id="recent-repo-paths">
         {recentPaths.map((p) => (
           <option key={p} value={p} />
