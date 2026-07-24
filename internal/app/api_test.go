@@ -231,6 +231,134 @@ func TestAPI_HealthDockerErrorFromStderr(t *testing.T) {
 	}
 }
 
+func TestAPI_EventPayload_SaveGetAndRejectMalformed(t *testing.T) {
+	stubDir := t.TempDir()
+	stubPath := filepath.Join(stubDir, "fake-act.sh")
+	if err := os.WriteFile(stubPath, []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
+		t.Fatalf("write stub: %v", err)
+	}
+	mux, _, _ := newTestRouter(t, stubPath)
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	// No payload saved yet.
+	resp, err := http.Get(server.URL + "/api/event-payload?repoPath=/r&workflowFile=ci.yml")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	var got struct {
+		Payload string `json:"payload"`
+	}
+	json.NewDecoder(resp.Body).Decode(&got)
+	resp.Body.Close()
+	if got.Payload != "" {
+		t.Fatalf("expected empty payload, got %q", got.Payload)
+	}
+
+	// Save a valid payload.
+	payload := `{"action":"labeled","label":{"name":"run-ci"}}`
+	body, _ := json.Marshal(map[string]string{"repoPath": "/r", "workflowFile": "ci.yml", "payload": payload})
+	resp, err = http.Post(server.URL+"/api/event-payload", "application/json", bytes.NewReader(body))
+	if err != nil || resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("save: err=%v status=%v", err, resp.StatusCode)
+	}
+
+	resp, err = http.Get(server.URL + "/api/event-payload?repoPath=/r&workflowFile=ci.yml")
+	if err != nil {
+		t.Fatalf("get after save: %v", err)
+	}
+	got = struct {
+		Payload string `json:"payload"`
+	}{}
+	json.NewDecoder(resp.Body).Decode(&got)
+	resp.Body.Close()
+	if got.Payload != payload {
+		t.Fatalf("got %q, want %q", got.Payload, payload)
+	}
+
+	// Malformed JSON is rejected with 400, doesn't overwrite the saved value.
+	badBody, _ := json.Marshal(map[string]string{"repoPath": "/r", "workflowFile": "ci.yml", "payload": "{not json"})
+	resp, err = http.Post(server.URL+"/api/event-payload", "application/json", bytes.NewReader(badBody))
+	if err != nil {
+		t.Fatalf("save malformed: %v", err)
+	}
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for malformed JSON, got %v", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	resp, _ = http.Get(server.URL + "/api/event-payload?repoPath=/r&workflowFile=ci.yml")
+	got = struct {
+		Payload string `json:"payload"`
+	}{}
+	json.NewDecoder(resp.Body).Decode(&got)
+	resp.Body.Close()
+	if got.Payload != payload {
+		t.Fatalf("expected unchanged payload after rejected save, got %q", got.Payload)
+	}
+}
+
+func TestAPI_CreateRun_RejectsMalformedEventPayload(t *testing.T) {
+	stubDir := t.TempDir()
+	stubPath := filepath.Join(stubDir, "fake-act.sh")
+	if err := os.WriteFile(stubPath, []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
+		t.Fatalf("write stub: %v", err)
+	}
+	mux, _, _ := newTestRouter(t, stubPath)
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	body, _ := json.Marshal(map[string]any{
+		"repoPath": "/r", "workflowFile": "ci.yml", "event": "push", "eventPayload": "{not json",
+	})
+	resp, err := http.Post(server.URL+"/api/runs", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("create run: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for malformed eventPayload, got %v", resp.StatusCode)
+	}
+}
+
+func TestAPI_CreateRun_ReachesActWithEventPayload(t *testing.T) {
+	repoDir := t.TempDir()
+	stubDir := t.TempDir()
+	stubPath := filepath.Join(stubDir, "fake-act.sh")
+	// Echo the -e file's contents so we can confirm the payload actually
+	// reaches the act invocation, not just gets stored.
+	script := "#!/bin/sh\nprev=\"\"\nfor arg in \"$@\"; do\n  if [ \"$prev\" = \"-e\" ]; then cat \"$arg\"; fi\n  prev=\"$arg\"\ndone\nexit 0\n"
+	if err := os.WriteFile(stubPath, []byte(script), 0755); err != nil {
+		t.Fatalf("write stub: %v", err)
+	}
+	mux, db, _ := newTestRouter(t, stubPath)
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	payload := `{"action":"labeled"}`
+	body, _ := json.Marshal(map[string]any{
+		"repoPath": repoDir, "workflowFile": "ci.yml", "event": "workflow_dispatch", "eventPayload": payload,
+	})
+	resp, err := http.Post(server.URL+"/api/runs", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("create run: %v", err)
+	}
+	var created struct {
+		RunID int64 `json:"runId"`
+	}
+	json.NewDecoder(resp.Body).Decode(&created)
+	resp.Body.Close()
+
+	waitForStatus(t, db, created.RunID, StatusSuccess)
+	logs, err := GetRunLogs(db, created.RunID)
+	if err != nil {
+		t.Fatalf("get logs: %v", err)
+	}
+	if len(logs) == 0 || logs[0] != payload {
+		t.Fatalf("expected act to receive the event payload verbatim, got %v", logs)
+	}
+}
+
 func TestTruncateTail(t *testing.T) {
 	if got := truncateTail("short", 300); got != "short" {
 		t.Fatalf("short string changed: %q", got)

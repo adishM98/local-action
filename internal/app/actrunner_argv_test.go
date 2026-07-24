@@ -7,10 +7,33 @@ import (
 
 func TestBuildArgv_NoInputs(t *testing.T) {
 	req := RunRequest{WorkflowFile: ".github/workflows/ci.yml", Event: "push"}
-	got := BuildArgv(req, "/tmp/secrets.env", "/tmp/vars.env", "/tmp/empty.env")
+	got := BuildArgv(req, "/tmp/secrets.env", "/tmp/vars.env", "/tmp/empty.env", "")
 	want := []string{
 		"push", "-W", ".github/workflows/ci.yml", "--json",
 		"--secret-file", "/tmp/secrets.env", "--var-file", "/tmp/vars.env", "--env-file", "/tmp/empty.env",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+func TestBuildArgv_EventPayloadOmittedWhenEmpty(t *testing.T) {
+	req := RunRequest{WorkflowFile: "ci.yml", Event: "push"}
+	got := BuildArgv(req, "/tmp/s.env", "/tmp/v.env", "/tmp/e.env", "")
+	for _, arg := range got {
+		if arg == "-e" {
+			t.Fatalf("expected no -e flag when eventPayloadFile is empty, got %v", got)
+		}
+	}
+}
+
+func TestBuildArgv_EventPayloadIncludedWhenSet(t *testing.T) {
+	req := RunRequest{WorkflowFile: "ci.yml", Event: "workflow_dispatch"}
+	got := BuildArgv(req, "/tmp/s.env", "/tmp/v.env", "/tmp/e.env", "/tmp/event.json")
+	want := []string{
+		"workflow_dispatch", "-W", "ci.yml", "--json",
+		"--secret-file", "/tmp/s.env", "--var-file", "/tmp/v.env", "--env-file", "/tmp/e.env",
+		"-e", "/tmp/event.json",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %v, want %v", got, want)
@@ -23,7 +46,7 @@ func TestBuildArgv_InputsAreSortedForDeterminism(t *testing.T) {
 		Event:        "workflow_dispatch",
 		Inputs:       map[string]string{"zeta": "1", "alpha": "hello world"},
 	}
-	got := BuildArgv(req, "/tmp/s.env", "/tmp/v.env", "/tmp/empty.env")
+	got := BuildArgv(req, "/tmp/s.env", "/tmp/v.env", "/tmp/empty.env", "")
 	want := []string{
 		"workflow_dispatch", "-W", "deploy.yml", "--json",
 		"--secret-file", "/tmp/s.env", "--var-file", "/tmp/v.env", "--env-file", "/tmp/empty.env",
@@ -43,7 +66,7 @@ func TestBuildArgv_EnvFileAlwaysPointsAtEmptyFile_NeverRealRepoDotenv(t *testing
 	// full contents into the log. --env-file must always be present and
 	// never equal to a path literally named ".env" in the repo itself.
 	req := RunRequest{WorkflowFile: "ci.yml", Event: "push"}
-	got := BuildArgv(req, "/tmp/s.env", "/tmp/v.env", "/tmp/local-action-empty.env")
+	got := BuildArgv(req, "/tmp/s.env", "/tmp/v.env", "/tmp/local-action-empty.env", "")
 	found := false
 	for i, arg := range got {
 		if arg == "--env-file" {

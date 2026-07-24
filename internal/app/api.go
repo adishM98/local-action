@@ -129,9 +129,14 @@ func NewRouter(db *sql.DB, key []byte, engine *Engine, hub *Hub, actBin string) 
 			Inputs       map[string]string `json:"inputs"`
 			ExtraSecrets map[string]string `json:"extraSecrets"`
 			ExtraVars    map[string]string `json:"extraVars"`
+			EventPayload string            `json:"eventPayload"`
 		}
 		if err := readJSON(r, &body); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if body.EventPayload != "" && !json.Valid([]byte(body.EventPayload)) {
+			http.Error(w, "eventPayload is not valid JSON", http.StatusBadRequest)
 			return
 		}
 		runID, err := engine.Enqueue(RunRequest{
@@ -141,12 +146,45 @@ func NewRouter(db *sql.DB, key []byte, engine *Engine, hub *Hub, actBin string) 
 			Inputs:       body.Inputs,
 			ExtraSecrets: body.ExtraSecrets,
 			ExtraVars:    body.ExtraVars,
+			EventPayload: body.EventPayload,
 		})
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]int64{"runId": runID})
+	})
+
+	mux.HandleFunc("GET /api/event-payload", func(w http.ResponseWriter, r *http.Request) {
+		repoPath := r.URL.Query().Get("repoPath")
+		workflowFile := r.URL.Query().Get("workflowFile")
+		payload, err := GetEventPayload(db, repoPath, workflowFile)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"payload": payload})
+	})
+
+	mux.HandleFunc("POST /api/event-payload", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			RepoPath     string `json:"repoPath"`
+			WorkflowFile string `json:"workflowFile"`
+			Payload      string `json:"payload"`
+		}
+		if err := readJSON(r, &body); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if body.Payload != "" && !json.Valid([]byte(body.Payload)) {
+			http.Error(w, "payload is not valid JSON", http.StatusBadRequest)
+			return
+		}
+		if err := SaveEventPayload(db, body.RepoPath, body.WorkflowFile, body.Payload); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 	})
 
 	mux.HandleFunc("GET /api/runs", func(w http.ResponseWriter, r *http.Request) {

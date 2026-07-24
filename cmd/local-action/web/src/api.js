@@ -20,6 +20,10 @@ export const api = {
     request('POST', '/api/secrets', { repoPath, kind, key, value, workflowFile }),
   deleteSecret: (repoPath, kind, key, workflowFile = '') =>
     request('DELETE', '/api/secrets', { repoPath, kind, key, workflowFile }),
+  getEventPayload: (repoPath, workflowFile) =>
+    request('GET', `/api/event-payload?repoPath=${encodeURIComponent(repoPath)}&workflowFile=${encodeURIComponent(workflowFile)}`),
+  saveEventPayload: (repoPath, workflowFile, payload) =>
+    request('POST', '/api/event-payload', { repoPath, workflowFile, payload }),
   createRun: (payload) => request('POST', '/api/runs', payload),
   listRuns: (repoPath) => request('GET', `/api/runs?repoPath=${encodeURIComponent(repoPath)}`),
   getRun: (id) => request('GET', `/api/runs/${id}`),

@@ -8,6 +8,9 @@ export default function RunWorkflowMenu({ repoPath, workflow, onStarted, onOpenS
   const [counts, setCounts] = useState(null)
   const [error, setError] = useState(null)
   const [starting, setStarting] = useState(false)
+  const [payloadOpen, setPayloadOpen] = useState(false)
+  const [payload, setPayload] = useState('')
+  const [payloadError, setPayloadError] = useState(null)
   const ref = useRef(null)
 
   useEffect(() => {
@@ -30,15 +33,36 @@ export default function RunWorkflowMenu({ repoPath, workflow, onStarted, onOpenS
       .catch(() => setCounts(null))
   }, [open, repoPath, workflow.file])
 
+  useEffect(() => {
+    if (!open) return
+    api
+      .getEventPayload(repoPath, workflow.file)
+      .then((result) => setPayload(result?.payload || ''))
+      .catch(() => setPayload(''))
+  }, [open, repoPath, workflow.file])
+
   async function run() {
+    const trimmed = payload.trim()
+    if (trimmed) {
+      try {
+        JSON.parse(trimmed)
+      } catch {
+        setPayloadError('Not valid JSON')
+        setPayloadOpen(true)
+        return
+      }
+    }
+    setPayloadError(null)
     setStarting(true)
     setError(null)
     try {
+      await api.saveEventPayload(repoPath, workflow.file, trimmed)
       const { runId } = await api.createRun({
         repoPath,
         workflowFile: workflow.file,
         event,
         inputs,
+        eventPayload: trimmed,
       })
       setOpen(false)
       onStarted(runId)
@@ -95,6 +119,27 @@ export default function RunWorkflowMenu({ repoPath, workflow, onStarted, onOpenS
               {input.description && <small>{input.description}</small>}
             </label>
           ))}
+          <div className="disclosure">
+            <button className="linklike" onClick={() => setPayloadOpen(!payloadOpen)}>
+              Event payload (JSON) {payloadOpen ? '▾' : '▸'}
+            </button>
+            {payloadOpen && (
+              <div className="field">
+                <textarea
+                  className="event-payload-input"
+                  rows={4}
+                  placeholder={'{\n  "action": "labeled",\n  "label": { "name": "run-ci" }\n}'}
+                  value={payload}
+                  onChange={(e) => {
+                    setPayload(e.target.value)
+                    setPayloadError(null)
+                  }}
+                />
+                <small>Fills github.event.* so if: conditions gated on event data can run locally.</small>
+                {payloadError && <p className="error">{payloadError}</p>}
+              </div>
+            )}
+          </div>
           {counts && (
             <p>
               <button className="linklike" onClick={() => onOpenSecrets(workflow.file)}>

@@ -34,6 +34,13 @@ CREATE TABLE IF NOT EXISTS run_logs (
   text TEXT NOT NULL,
   PRIMARY KEY (run_id, line_no)
 );
+
+CREATE TABLE IF NOT EXISTS event_payloads (
+  repo_path TEXT NOT NULL,
+  workflow_file TEXT NOT NULL,
+  payload TEXT NOT NULL,
+  PRIMARY KEY (repo_path, workflow_file)
+);
 `
 
 func OpenDB(path string) (*sql.DB, error) {
