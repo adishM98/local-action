@@ -21,7 +21,42 @@ type WorkflowInfo struct {
 	UsedSecrets      []string        `json:"usedSecrets,omitempty"`
 	UsedVars         []string        `json:"usedVars,omitempty"`
 	AutoEventPayload string          `json:"autoEventPayload,omitempty"`
+	AutoCategory     string          `json:"autoCategory"`
 	ParseError       string          `json:"parseError,omitempty"`
+}
+
+// categoryKeywords is checked in order — more specific categories (Security)
+// must win over generic ones (CI/Build) even when a name contains both
+// (e.g. "Grype - Docker Image Vulnerability Scan" contains "docker" but is
+// clearly a security scan, not a build).
+var categoryKeywords = []struct {
+	category string
+	keywords []string
+}{
+	{"Security", []string{"security", "vulnerab", "licen", "compliance", "grype", "cve"}},
+	{"Deployment", []string{"deploy", "publish", "render", "netlify"}},
+	{"Testing", []string{"test", "cypress", "coverage", "e2e"}},
+	{"Docs", []string{"docs", "storybook"}},
+	{"CI/Build", []string{"build", "docker", "packer", "ami", "image"}},
+}
+
+var ciWordRe = regexp.MustCompile(`\bci\b`)
+
+// autoCategoryFor guesses a sidebar category from a workflow's name and file
+// path. Falls back to "Other" when nothing matches — never hides a workflow.
+func autoCategoryFor(name, file string) string {
+	haystack := strings.ToLower(name + " " + file)
+	for _, c := range categoryKeywords {
+		for _, kw := range c.keywords {
+			if strings.Contains(haystack, kw) {
+				return c.category
+			}
+		}
+	}
+	if ciWordRe.MatchString(haystack) {
+		return "CI/Build"
+	}
+	return "Other"
 }
 
 var (
@@ -103,6 +138,7 @@ func ParseWorkflowFile(path string) (WorkflowInfo, error) {
 	info := WorkflowInfo{Name: filepath.Base(path)}
 	info.UsedSecrets = findRefs(secretRefRe, data, map[string]bool{"GITHUB_TOKEN": true})
 	info.UsedVars = findRefs(varRefRe, data, nil)
+	info.AutoCategory = autoCategoryFor(info.Name, filepath.Base(path))
 
 	var doc yaml.Node
 	if err := yaml.Unmarshal(data, &doc); err != nil {
@@ -134,6 +170,8 @@ func ParseWorkflowFile(path string) (WorkflowInfo, error) {
 			jobsNode = valNode
 		}
 	}
+
+	info.AutoCategory = autoCategoryFor(info.Name, filepath.Base(path))
 
 	if jobsNode != nil {
 		info.AutoEventPayload = autoEventPayloadFromJobs(jobsNode)

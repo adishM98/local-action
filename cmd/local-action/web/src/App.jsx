@@ -9,6 +9,7 @@ import SecretsPage from './components/SecretsPage.jsx'
 export default function App() {
   const [repoPath, setRepoPath] = useState(localStorage.getItem('repoPath') || '')
   const [workflows, setWorkflows] = useState([])
+  const [categories, setCategories] = useState({})
   const [scanState, setScanState] = useState({ scanned: false, error: null })
   const [view, setView] = useState({ name: 'runs', workflowFile: null })
   const [health, setHealth] = useState(null)
@@ -44,6 +45,11 @@ export default function App() {
       setWorkflows([])
       setScanState({ scanned: true, error: err.message })
     }
+    try {
+      setCategories((await api.getWorkflowCategories(path)) || {})
+    } catch {
+      setCategories({})
+    }
   }, [])
 
   useEffect(() => {
@@ -62,7 +68,22 @@ export default function App() {
     <div className="app">
       <TopBar repoPath={repoPath} onCommit={commitRepoPath} health={health} onRecheck={checkHealth} />
       <div className="shell">
-        <Sidebar workflows={workflows} scanState={scanState} view={view} onNavigate={setView} />
+        <Sidebar
+          workflows={workflows}
+          scanState={scanState}
+          view={view}
+          onNavigate={setView}
+          repoPath={repoPath}
+          categories={categories}
+          onCategoryChange={(file, category) =>
+            setCategories((prev) => {
+              const next = { ...prev }
+              if (category) next[file] = category
+              else delete next[file]
+              return next
+            })
+          }
+        />
         <main className="content">
           {view.name === 'runs' && (
             <RunsView

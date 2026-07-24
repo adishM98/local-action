@@ -41,6 +41,13 @@ CREATE TABLE IF NOT EXISTS event_payloads (
   payload TEXT NOT NULL,
   PRIMARY KEY (repo_path, workflow_file)
 );
+
+CREATE TABLE IF NOT EXISTS workflow_categories (
+  repo_path TEXT NOT NULL,
+  workflow_file TEXT NOT NULL,
+  category TEXT NOT NULL,
+  PRIMARY KEY (repo_path, workflow_file)
+);
 `
 
 func OpenDB(path string) (*sql.DB, error) {

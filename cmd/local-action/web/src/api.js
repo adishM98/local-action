@@ -24,6 +24,10 @@ export const api = {
     request('GET', `/api/event-payload?repoPath=${encodeURIComponent(repoPath)}&workflowFile=${encodeURIComponent(workflowFile)}`),
   saveEventPayload: (repoPath, workflowFile, payload) =>
     request('POST', '/api/event-payload', { repoPath, workflowFile, payload }),
+  getWorkflowCategories: (repoPath) =>
+    request('GET', `/api/workflow-categories?repoPath=${encodeURIComponent(repoPath)}`),
+  saveWorkflowCategory: (repoPath, workflowFile, category) =>
+    request('POST', '/api/workflow-categories', { repoPath, workflowFile, category }),
   createRun: (payload) => request('POST', '/api/runs', payload),
   listRuns: (repoPath) => request('GET', `/api/runs?repoPath=${encodeURIComponent(repoPath)}`),
   getRun: (id) => request('GET', `/api/runs/${id}`),

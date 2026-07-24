@@ -359,6 +359,45 @@ func TestAPI_CreateRun_ReachesActWithEventPayload(t *testing.T) {
 	}
 }
 
+func TestAPI_WorkflowCategories_SaveAndGet(t *testing.T) {
+	stubDir := t.TempDir()
+	stubPath := filepath.Join(stubDir, "fake-act.sh")
+	if err := os.WriteFile(stubPath, []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
+		t.Fatalf("write stub: %v", err)
+	}
+	mux, _, _ := newTestRouter(t, stubPath)
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/api/workflow-categories?repoPath=/r")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	var got map[string]string
+	json.NewDecoder(resp.Body).Decode(&got)
+	resp.Body.Close()
+	if len(got) != 0 {
+		t.Fatalf("expected empty map, got %v", got)
+	}
+
+	body, _ := json.Marshal(map[string]string{"repoPath": "/r", "workflowFile": "ci.yml", "category": "Testing"})
+	resp, err = http.Post(server.URL+"/api/workflow-categories", "application/json", bytes.NewReader(body))
+	if err != nil || resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("save: err=%v status=%v", err, resp.StatusCode)
+	}
+
+	resp, err = http.Get(server.URL + "/api/workflow-categories?repoPath=/r")
+	if err != nil {
+		t.Fatalf("get after save: %v", err)
+	}
+	got = nil
+	json.NewDecoder(resp.Body).Decode(&got)
+	resp.Body.Close()
+	if got["ci.yml"] != "Testing" {
+		t.Fatalf("got %v, want ci.yml=Testing", got)
+	}
+}
+
 func TestTruncateTail(t *testing.T) {
 	if got := truncateTail("short", 300); got != "short" {
 		t.Fatalf("short string changed: %q", got)

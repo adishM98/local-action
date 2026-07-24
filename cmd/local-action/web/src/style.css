@@ -143,6 +143,47 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 .sidebar__note--error { color: var(--red); }
 .sidebar__spacer { flex: 1; }
 
+.sidebar__group { margin-top: 4px; }
+.sidebar__group-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.sidebar__group-heading:hover { color: var(--text); }
+.sidebar__group-chevron { width: 10px; font-size: 10px; }
+.sidebar__group-icon { font-size: 12px; }
+
+.sidebar__item-row { position: relative; display: flex; align-items: center; }
+.sidebar__item-row .sidebar__item { flex: 1; padding-left: 24px; }
+.sidebar__category-select {
+  position: absolute;
+  right: 4px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 11px;
+  padding: 1px 4px;
+  max-width: 90px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+.sidebar__item-row:hover .sidebar__category-select,
+.sidebar__item-row:focus-within .sidebar__category-select {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .content { flex: 1; overflow-y: auto; padding: 24px 32px; }
 
 /* ── Runs list ───────────────────────────────────────── */

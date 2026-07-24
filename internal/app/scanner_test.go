@@ -235,6 +235,42 @@ jobs:
 	}
 }
 
+func TestAutoCategoryFor_PriorityOrderMatchesRealWorkflowNames(t *testing.T) {
+	cases := []struct {
+		name, file, want string
+	}{
+		{"Grype - Docker Image Vulnerability Scan", "grype.yml", "Security"},
+		{"License Compliance Check", "license.yml", "Security"},
+		{"Manual Docker Build and Push", "docker-build.yml", "CI/Build"},
+		{"Deploy Storybook to Netlify", "deploy-storybook.yml", "Deployment"},
+		{"Cypress AppBuilder", "cypress-appbuilder.yml", "Testing"},
+		{"Update test system (LTS and pre-release)", "update-test.yml", "Testing"},
+		{"CI", "ci.yml", "CI/Build"},
+		{"Merge Submodule PRs", "merge-submodules.yml", "Other"},
+		{"Vulnerability CI", "vuln-ci.yml", "Security"},
+		{"AWS AMI build using Packer config", "ami-packer.yml", "CI/Build"},
+		{"Render PR deploy Docs", "render-docs.yml", "Deployment"},
+	}
+	for _, c := range cases {
+		got := autoCategoryFor(c.name, c.file)
+		if got != c.want {
+			t.Errorf("autoCategoryFor(%q, %q) = %q, want %q", c.name, c.file, got, c.want)
+		}
+	}
+}
+
+func TestParseWorkflowFile_SetsAutoCategory(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "deploy.yml", "name: Deploy to Netlify\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps: []\n")
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	if workflows[0].AutoCategory != "Deployment" {
+		t.Errorf("got %q, want Deployment", workflows[0].AutoCategory)
+	}
+}
+
 func TestScanWorkflows_StringEvent(t *testing.T) {
 	repo := t.TempDir()
 	writeWorkflow(t, repo, "ci.yml", "name: CI\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps: []\n")

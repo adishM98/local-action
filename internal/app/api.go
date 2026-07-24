@@ -187,6 +187,33 @@ func NewRouter(db *sql.DB, key []byte, engine *Engine, hub *Hub, actBin string) 
 		w.WriteHeader(http.StatusNoContent)
 	})
 
+	mux.HandleFunc("GET /api/workflow-categories", func(w http.ResponseWriter, r *http.Request) {
+		repoPath := r.URL.Query().Get("repoPath")
+		categories, err := GetWorkflowCategories(db, repoPath)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, categories)
+	})
+
+	mux.HandleFunc("POST /api/workflow-categories", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			RepoPath     string `json:"repoPath"`
+			WorkflowFile string `json:"workflowFile"`
+			Category     string `json:"category"`
+		}
+		if err := readJSON(r, &body); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if err := SaveWorkflowCategory(db, body.RepoPath, body.WorkflowFile, body.Category); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
 	mux.HandleFunc("GET /api/runs", func(w http.ResponseWriter, r *http.Request) {
 		repoPath := r.URL.Query().Get("repoPath")
 		runs, err := ListRuns(db, repoPath)
