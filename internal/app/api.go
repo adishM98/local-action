@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os/exec"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -29,13 +30,24 @@ func NewRouter(db *sql.DB, key []byte, engine *Engine, hub *Hub, actBin string) 
 		defer cancel()
 
 		actOut, actErr := exec.CommandContext(ctx, actBin, "--version").CombinedOutput()
-		dockerErr := exec.CommandContext(ctx, "docker", "info").Run()
+		dockerOut, dockerErr := exec.CommandContext(ctx, "docker", "info").CombinedOutput()
 
-		writeJSON(w, http.StatusOK, map[string]any{
+		resp := map[string]any{
 			"actOK":      actErr == nil,
 			"actVersion": string(actOut),
 			"dockerOK":   dockerErr == nil,
-		})
+		}
+		if dockerErr != nil {
+			msg := strings.TrimSpace(string(dockerOut))
+			if msg == "" {
+				msg = dockerErr.Error()
+			}
+			if len(msg) > 300 {
+				msg = msg[:300]
+			}
+			resp["dockerError"] = msg
+		}
+		writeJSON(w, http.StatusOK, resp)
 	})
 
 	mux.HandleFunc("POST /api/scan", func(w http.ResponseWriter, r *http.Request) {
@@ -67,16 +79,17 @@ func NewRouter(db *sql.DB, key []byte, engine *Engine, hub *Hub, actBin string) 
 
 	mux.HandleFunc("POST /api/secrets", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
-			RepoPath string     `json:"repoPath"`
-			Kind     SecretKind `json:"kind"`
-			Key      string     `json:"key"`
-			Value    string     `json:"value"`
+			RepoPath     string     `json:"repoPath"`
+			Kind         SecretKind `json:"kind"`
+			Key          string     `json:"key"`
+			Value        string     `json:"value"`
+			WorkflowFile string     `json:"workflowFile"`
 		}
 		if err := readJSON(r, &body); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if err := UpsertSecret(db, key, body.RepoPath, body.Kind, body.Key, body.Value, ""); err != nil {
+		if err := UpsertSecret(db, key, body.RepoPath, body.Kind, body.Key, body.Value, body.WorkflowFile); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -85,15 +98,16 @@ func NewRouter(db *sql.DB, key []byte, engine *Engine, hub *Hub, actBin string) 
 
 	mux.HandleFunc("DELETE /api/secrets", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
-			RepoPath string     `json:"repoPath"`
-			Kind     SecretKind `json:"kind"`
-			Key      string     `json:"key"`
+			RepoPath     string     `json:"repoPath"`
+			Kind         SecretKind `json:"kind"`
+			Key          string     `json:"key"`
+			WorkflowFile string     `json:"workflowFile"`
 		}
 		if err := readJSON(r, &body); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if err := DeleteSecret(db, body.RepoPath, body.Kind, body.Key, ""); err != nil {
+		if err := DeleteSecret(db, body.RepoPath, body.Kind, body.Key, body.WorkflowFile); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}

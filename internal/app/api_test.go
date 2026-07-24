@@ -139,3 +139,55 @@ func TestAPI_GetRun_NotFound(t *testing.T) {
 func itoa(n int64) string {
 	return string(rune('0' + n%10)) // fine for single-digit run IDs in this small test DB
 }
+
+func TestAPI_WorkflowScopedSecrets(t *testing.T) {
+	stubDir := t.TempDir()
+	stubPath := filepath.Join(stubDir, "fake-act.sh")
+	if err := os.WriteFile(stubPath, []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
+		t.Fatalf("write stub: %v", err)
+	}
+	mux, _, _ := newTestRouter(t, stubPath)
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	post := func(payload map[string]string) {
+		t.Helper()
+		body, _ := json.Marshal(payload)
+		resp, err := http.Post(server.URL+"/api/secrets", "application/json", bytes.NewReader(body))
+		if err != nil || resp.StatusCode != http.StatusNoContent {
+			t.Fatalf("upsert %v: err=%v status=%v", payload, err, resp.StatusCode)
+		}
+	}
+	post(map[string]string{"repoPath": "/r", "kind": "secret", "key": "FOO", "value": "repo"})
+	post(map[string]string{"repoPath": "/r", "kind": "secret", "key": "FOO", "value": "ci", "workflowFile": "ci.yml"})
+
+	resp, err := http.Get(server.URL + "/api/secrets?repoPath=/r&kind=secret")
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	var entries []SecretEntry
+	json.NewDecoder(resp.Body).Decode(&entries)
+	resp.Body.Close()
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 entries (repo-wide + workflow), got %+v", entries)
+	}
+	if entries[0].WorkflowFile != "" || entries[1].WorkflowFile != "ci.yml" {
+		t.Fatalf("expected ordering repo-wide then ci.yml, got %+v", entries)
+	}
+
+	// Delete only the workflow-scoped one.
+	delBody, _ := json.Marshal(map[string]string{"repoPath": "/r", "kind": "secret", "key": "FOO", "workflowFile": "ci.yml"})
+	req, _ := http.NewRequest(http.MethodDelete, server.URL+"/api/secrets", bytes.NewReader(delBody))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil || resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("delete: err=%v status=%v", err, resp.StatusCode)
+	}
+	resp, _ = http.Get(server.URL + "/api/secrets?repoPath=/r&kind=secret")
+	entries = nil
+	json.NewDecoder(resp.Body).Decode(&entries)
+	resp.Body.Close()
+	if len(entries) != 1 || entries[0].WorkflowFile != "" {
+		t.Fatalf("expected only the repo-wide entry to remain, got %+v", entries)
+	}
+}
