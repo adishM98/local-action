@@ -139,6 +139,15 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 }
 .sidebar__item:hover { background: var(--panel-2); }
 .sidebar__item.active { background: var(--panel-2); font-weight: 600; box-shadow: inset 2px 0 0 var(--accent); }
+.sidebar__search {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 5px 8px;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
 .sidebar__note { color: var(--muted); font-size: 12px; padding: 4px 8px; }
 .sidebar__note--error { color: var(--red); }
 .sidebar__spacer { flex: 1; }
@@ -198,6 +207,25 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   display: flex;
   gap: 12px;
   margin-bottom: 24px;
+}
+
+.toolbar { display: flex; gap: 10px; margin-bottom: 16px; }
+.toolbar__search {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 6px 10px;
+  font-size: 13px;
+}
+.toolbar select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 6px 10px;
+  font-size: 13px;
 }
 .stat-card {
   flex: 1;

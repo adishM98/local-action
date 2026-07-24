@@ -21,6 +21,7 @@ function loadCollapsed() {
 
 export default function Sidebar({ workflows, scanState, view, onNavigate, repoPath, categories, onCategoryChange }) {
   const [collapsed, setCollapsed] = useState(loadCollapsed)
+  const [search, setSearch] = useState('')
   const inRuns = view.name === 'runs' || view.name === 'run'
 
   function toggleCategory(name) {
@@ -40,8 +41,11 @@ export default function Sidebar({ workflows, scanState, view, onNavigate, repoPa
     }
   }
 
+  const q = search.trim().toLowerCase()
+  const matching = q ? workflows.filter((wf) => wf.name.toLowerCase().includes(q)) : workflows
+
   const groups = {}
-  for (const wf of workflows) {
+  for (const wf of matching) {
     const effective = categories[wf.file] || wf.autoCategory || 'Other'
     ;(groups[effective] ||= []).push(wf)
   }
@@ -49,12 +53,21 @@ export default function Sidebar({ workflows, scanState, view, onNavigate, repoPa
   return (
     <nav className="sidebar">
       <div className="sidebar__heading">Actions</div>
+      {workflows.length > 5 && (
+        <input
+          className="sidebar__search"
+          placeholder="Search workflows…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      )}
       <button
         className={`sidebar__item${inRuns && !view.workflowFile ? ' active' : ''}`}
         onClick={() => onNavigate({ name: 'runs', workflowFile: null })}
       >
         All workflows
       </button>
+      {q && matching.length === 0 && <p className="sidebar__note">No workflows match "{search}".</p>}
       {CATEGORY_ORDER.filter((c) => groups[c]?.length).map((category) => (
         <div className="sidebar__group" key={category}>
           <button className="sidebar__group-heading" onClick={() => toggleCategory(category)}>

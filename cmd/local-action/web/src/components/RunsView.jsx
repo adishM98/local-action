@@ -2,11 +2,17 @@ import { useEffect, useState } from 'react'
 import { api } from '../api.js'
 import { StatusBadge } from './StatusIcon.jsx'
 import RunWorkflowMenu from './RunWorkflowMenu.jsx'
-import { relativeTime, duration, formatDurationMs, computeRunStats } from '../format.js'
+import { relativeTime, duration, formatDurationMs, computeRunStats, filterRuns } from '../format.js'
+
+const STATUS_OPTIONS = ['success', 'failed', 'running', 'queued', 'cancelled']
+const STATUS_LABEL = { success: 'Passed', failed: 'Failed', running: 'Running', queued: 'Queued', cancelled: 'Cancelled' }
 
 export default function RunsView({ repoPath, workflows, workflowFile, health, onOpenRun, onOpenSecrets }) {
   const [runs, setRuns] = useState([])
   const [error, setError] = useState(null)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [eventFilter, setEventFilter] = useState('')
 
   useEffect(() => {
     if (!repoPath) return
@@ -37,6 +43,8 @@ export default function RunsView({ repoPath, workflows, workflowFile, health, on
   const workflow = workflowFile ? workflows.find((w) => w.file === workflowFile) : null
   const visible = workflowFile ? runs.filter((r) => r.workflowFile === workflowFile) : runs
   const wfName = (file) => workflows.find((w) => w.file === file)?.name || file
+  const events = [...new Set(visible.map((r) => r.event))].sort()
+  const filtered = filterRuns(visible, { search, status: statusFilter, event: eventFilter }, (r) => wfName(r.workflowFile))
 
   return (
     <div className="runs-view">
@@ -58,9 +66,36 @@ export default function RunsView({ repoPath, workflows, workflowFile, health, on
       )}
       {error && <p className="error">{error}</p>}
       {visible.length > 0 && <StatCards runs={visible} />}
+      {visible.length > 0 && (
+        <div className="toolbar">
+          <input
+            className="toolbar__search"
+            placeholder="Search runs…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="">All statuses</option>
+            {STATUS_OPTIONS.map((s) => (
+              <option key={s} value={s}>
+                {STATUS_LABEL[s]}
+              </option>
+            ))}
+          </select>
+          <select value={eventFilter} onChange={(e) => setEventFilter(e.target.value)}>
+            <option value="">All events</option>
+            {events.map((ev) => (
+              <option key={ev} value={ev}>
+                {ev}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       <div className="run-rows">
         {visible.length === 0 && !error && <p className="empty-state">No runs yet.</p>}
-        {visible.map((run) => (
+        {visible.length > 0 && filtered.length === 0 && <p className="empty-state">No runs match these filters.</p>}
+        {filtered.map((run) => (
           <button key={run.id} className="run-row" onClick={() => onOpenRun(run.id)}>
             <StatusBadge status={run.status} />
             <span className="run-row__main">

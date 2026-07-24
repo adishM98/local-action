@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { formatDurationMs, computeRunStats } from './format.js'
+import { formatDurationMs, computeRunStats, filterRuns } from './format.js'
 
 const run = (status, startedAt, finishedAt) => ({
   status,
@@ -41,6 +41,38 @@ test('computeRunStats: avgDurationMs only over finished runs (excludes running)'
 test('computeRunStats: avgDurationMs is null when nothing has finished', () => {
   const stats = computeRunStats([run('running', 100, null), run('queued', null, null)])
   assert.equal(stats.avgDurationMs, null)
+})
+
+const nameFor = (r) => (r.workflowFile === 'ci.yml' ? 'CI' : 'Deploy')
+
+test('filterRuns: empty filters pass everything through', () => {
+  const runs = [
+    { id: 1, workflowFile: 'ci.yml', event: 'push', status: 'success' },
+    { id: 2, workflowFile: 'deploy.yml', event: 'workflow_dispatch', status: 'failed' },
+  ]
+  assert.deepEqual(filterRuns(runs, { search: '', status: '', event: '' }, nameFor), runs)
+})
+
+test('filterRuns: search matches workflow name, event, id, or status (case-insensitive)', () => {
+  const runs = [
+    { id: 1, workflowFile: 'ci.yml', event: 'push', status: 'success' },
+    { id: 2, workflowFile: 'deploy.yml', event: 'workflow_dispatch', status: 'failed' },
+  ]
+  assert.deepEqual(filterRuns(runs, { search: 'deploy', status: '', event: '' }, nameFor), [runs[1]])
+  assert.deepEqual(filterRuns(runs, { search: 'PUSH', status: '', event: '' }, nameFor), [runs[0]])
+  assert.deepEqual(filterRuns(runs, { search: '#2', status: '', event: '' }, nameFor), [runs[1]])
+  assert.deepEqual(filterRuns(runs, { search: 'failed', status: '', event: '' }, nameFor), [runs[1]])
+})
+
+test('filterRuns: status and event filters combine with search (AND)', () => {
+  const runs = [
+    { id: 1, workflowFile: 'ci.yml', event: 'push', status: 'success' },
+    { id: 2, workflowFile: 'ci.yml', event: 'push', status: 'failed' },
+    { id: 3, workflowFile: 'ci.yml', event: 'workflow_dispatch', status: 'success' },
+  ]
+  assert.deepEqual(filterRuns(runs, { search: '', status: 'success', event: '' }, nameFor), [runs[0], runs[2]])
+  assert.deepEqual(filterRuns(runs, { search: '', status: '', event: 'push' }, nameFor), [runs[0], runs[1]])
+  assert.deepEqual(filterRuns(runs, { search: '', status: 'success', event: 'push' }, nameFor), [runs[0]])
 })
 
 test('formatDurationMs: null/undefined renders empty', () => {
