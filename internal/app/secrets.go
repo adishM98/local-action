@@ -82,7 +82,7 @@ func DeleteSecret(db *sql.DB, repoPath string, kind SecretKind, name, workflowFi
 
 // SecretsForRun returns the decrypted values injected into a run of
 // workflowFile: repo-wide entries overlaid by workflow-specific entries
-// (workflow wins on name clash). The ORDER BY puts '' (repo-wide) first so
+// (workflow wins on name clash). The ORDER BY puts ” (repo-wide) first so
 // the overlay is a simple map overwrite.
 func SecretsForRun(db *sql.DB, encKey []byte, repoPath, workflowFile string, kind SecretKind) (map[string]string, error) {
 	rows, err := db.Query(

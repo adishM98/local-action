@@ -63,7 +63,7 @@ func OpenDB(path string) (*sql.DB, error) {
 }
 
 // migrateSecretsWorkflowFile upgrades a pre-workflow_file secrets table in
-// place. Old rows become repo-wide (workflow_file = ''). SQLite can't add a
+// place. Old rows become repo-wide (workflow_file = ”). SQLite can't add a
 // column into an existing PRIMARY KEY, so we rebuild the table. The rebuild
 // is wrapped in a transaction to ensure all-or-nothing semantics on crash.
 func migrateSecretsWorkflowFile(db *sql.DB) error {
