@@ -1,53 +1,94 @@
-import { useState } from 'react'
-import PromptBar from './components/PromptBar.jsx'
-import WorkflowsPanel from './components/WorkflowsPanel.jsx'
-import SecretsPanel from './components/SecretsPanel.jsx'
-import HistoryPanel from './components/HistoryPanel.jsx'
-
-const TABS = [
-  { id: 'workflows', label: 'Workflows', glyph: '▤' },
-  { id: 'secrets', label: 'Secrets', glyph: '◈' },
-  { id: 'history', label: 'History', glyph: '◷' },
-]
+import { useCallback, useEffect, useState } from 'react'
+import { api } from './api.js'
+import TopBar from './components/TopBar.jsx'
+import Sidebar from './components/Sidebar.jsx'
+import RunsView from './components/RunsView.jsx'
+import RunDetail from './components/RunDetail.jsx'
+import SecretsPage from './components/SecretsPage.jsx'
 
 export default function App() {
   const [repoPath, setRepoPath] = useState(localStorage.getItem('repoPath') || '')
-  const [tab, setTab] = useState('workflows')
-  const [activeRunId, setActiveRunId] = useState(null)
+  const [workflows, setWorkflows] = useState([])
+  const [scanState, setScanState] = useState({ scanned: false, error: null })
+  const [view, setView] = useState({ name: 'runs', workflowFile: null })
+  const [health, setHealth] = useState(null)
 
-  function updateRepoPath(path) {
+  const checkHealth = useCallback(async () => {
+    try {
+      setHealth(await api.health())
+    } catch {
+      setHealth({ actOK: false, dockerOK: false, dockerError: 'server unreachable' })
+    }
+  }, [])
+
+  useEffect(() => {
+    checkHealth()
+  }, [checkHealth])
+
+  // Poll fast while unhealthy so a booting Docker Desktop turns the dot
+  // green within seconds; back off once everything is fine.
+  useEffect(() => {
+    if (!health) return
+    const healthy = health.actOK && health.dockerOK
+    const id = setTimeout(checkHealth, healthy ? 30000 : 5000)
+    return () => clearTimeout(id)
+  }, [health, checkHealth])
+
+  const scan = useCallback(async (path) => {
+    if (!path) return
+    try {
+      const result = await api.scan(path)
+      setWorkflows(result || [])
+      setScanState({ scanned: true, error: null })
+    } catch (err) {
+      setWorkflows([])
+      setScanState({ scanned: true, error: err.message })
+    }
+  }, [])
+
+  useEffect(() => {
+    scan(repoPath)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // initial scan for the remembered path only; later scans go through commitRepoPath
+
+  function commitRepoPath(path) {
     setRepoPath(path)
     localStorage.setItem('repoPath', path)
-  }
-
-  function onRunStarted(runId) {
-    setActiveRunId(runId)
-    setTab('history')
+    setView({ name: 'runs', workflowFile: null })
+    scan(path)
   }
 
   return (
     <div className="app">
-      <PromptBar repoPath={repoPath} setRepoPath={updateRepoPath} />
+      <TopBar repoPath={repoPath} onCommit={commitRepoPath} health={health} onRecheck={checkHealth} />
       <div className="shell">
-        <nav className="side-nav">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              className={`side-nav__item${tab === t.id ? ' active' : ''}`}
-              onClick={() => setTab(t.id)}
-            >
-              <span className="side-nav__glyph">{t.glyph}</span>
-              {t.label}
-            </button>
-          ))}
-        </nav>
-        <div className="content">
-          {tab === 'workflows' && (
-            <WorkflowsPanel repoPath={repoPath} onRunStarted={onRunStarted} />
+        <Sidebar workflows={workflows} scanState={scanState} view={view} onNavigate={setView} />
+        <main className="content">
+          {view.name === 'runs' && (
+            <RunsView
+              repoPath={repoPath}
+              workflows={workflows}
+              workflowFile={view.workflowFile}
+              health={health}
+              onOpenRun={(runId) => setView({ name: 'run', runId, workflowFile: view.workflowFile })}
+              onOpenSecrets={(workflowFile) => setView({ name: 'secrets', workflowFile })}
+            />
           )}
-          {tab === 'secrets' && <SecretsPanel repoPath={repoPath} />}
-          {tab === 'history' && <HistoryPanel repoPath={repoPath} activeRunId={activeRunId} />}
-        </div>
+          {view.name === 'run' && (
+            <RunDetail
+              runId={view.runId}
+              onBack={() => setView({ name: 'runs', workflowFile: view.workflowFile || null })}
+              onOpenRun={(runId) => setView({ name: 'run', runId, workflowFile: view.workflowFile })}
+            />
+          )}
+          {view.name === 'secrets' && (
+            <SecretsPage
+              repoPath={repoPath}
+              workflows={workflows}
+              initialWorkflowFilter={view.workflowFile || ''}
+            />
+          )}
+        </main>
       </div>
     </div>
   )
