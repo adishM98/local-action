@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api.js'
-import { StatusBadge } from './StatusIcon.jsx'
+import StatusIcon, { StatusBadge } from './StatusIcon.jsx'
 import RunWorkflowMenu from './RunWorkflowMenu.jsx'
 import { relativeTime, duration, formatDurationMs, computeRunStats, filterRuns } from '../format.js'
 
@@ -80,6 +80,7 @@ export default function RunsView({ repoPath, workflows, workflowFile, health, on
         <div className="banner banner--warn">Docker is not running — workflow runs will fail.</div>
       )}
       {error && <p className="error">{error}</p>}
+      {!workflowFile && visible.length > 0 && <RecentActivity runs={visible} wfName={wfName} />}
       {visible.length > 0 && <StatCards runs={visible} />}
       {visible.length > 0 && (
         <div className="toolbar">
@@ -118,7 +119,16 @@ export default function RunsView({ repoPath, workflows, workflowFile, health, on
         </div>
       )}
       <div className="run-rows">
-        {visible.length === 0 && !error && <p className="empty-state">No runs yet.</p>}
+        {visible.length === 0 && !error && (
+          <div className="empty-state empty-state--rich">
+            <p className="empty-state__heading">No runs yet</p>
+            <p>
+              {workflow
+                ? 'Trigger a run with the "Run workflow ▾" button above to see activity here.'
+                : 'Pick a workflow from the sidebar and trigger a run to see activity here.'}
+            </p>
+          </div>
+        )}
         {visible.length > 0 && filtered.length === 0 && <p className="empty-state">No runs match these filters.</p>}
         {paged.map((run) => (
           <button key={run.id} className="run-row" onClick={() => onOpenRun(run.id)}>
@@ -152,6 +162,32 @@ export default function RunsView({ repoPath, workflows, workflowFile, health, on
           </button>
         </div>
       )}
+    </div>
+  )
+}
+
+const ACTIVITY_VERB = {
+  success: 'succeeded',
+  failed: 'failed',
+  running: 'started',
+  cancelled: 'was cancelled',
+  queued: 'was queued',
+}
+
+function RecentActivity({ runs, wfName }) {
+  const recent = runs.slice(0, 5)
+  return (
+    <div className="recent-activity">
+      <div className="recent-activity__heading">Recent activity</div>
+      {recent.map((run) => (
+        <div className="recent-activity__item" key={run.id}>
+          <StatusIcon status={run.status} />
+          <span>
+            {wfName(run.workflowFile)} #{run.id} {ACTIVITY_VERB[run.status] || run.status}
+          </span>
+          <span className="recent-activity__time">{relativeTime(run.createdAt)}</span>
+        </div>
+      ))}
     </div>
   )
 }
