@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api.js'
-import StatusIcon from './StatusIcon.jsx'
+import StatusIcon, { StatusBadge } from './StatusIcon.jsx'
 import { relativeTime, duration, formatDurationMs } from '../format.js'
 import { parseLogLines } from '../logparse.js'
 
@@ -122,7 +122,7 @@ export default function RunDetail({ runId, onBack, onOpenRun }) {
         ← All runs
       </button>
       <div className="run-detail__head">
-        <StatusIcon status={run?.status} />
+        <StatusBadge status={run?.status} />
         <h2>{run ? `${run.workflowFile} #${run.id}` : `Run #${runId}`}</h2>
         {run && (
           <span className="run-detail__meta">

@@ -30,3 +30,36 @@ export function duration(run) {
   const s = secs % 60
   return m ? `${m}m ${s}s` : `${s}s`
 }
+
+// computeRunStats aggregates the dashboard stat-card numbers from an
+// already-loaded runs list — no separate API call. avgDurationMs is only
+// computed over runs with both startedAt and finishedAt set (a run still
+// in progress has no finishedAt yet and would skew the average).
+export function computeRunStats(runs) {
+  let passed = 0
+  let failed = 0
+  let running = 0
+  let finishedCount = 0
+  let finishedTotalMs = 0
+
+  for (const run of runs) {
+    if (run.status === 'success') passed++
+    else if (run.status === 'failed') failed++
+    else if (run.status === 'running') running++
+
+    const start = unwrap(run.startedAt)
+    const end = unwrap(run.finishedAt)
+    if (start != null && end != null) {
+      finishedCount++
+      finishedTotalMs += (end - start) * 1000
+    }
+  }
+
+  return {
+    total: runs.length,
+    passed,
+    failed,
+    running,
+    avgDurationMs: finishedCount ? Math.round(finishedTotalMs / finishedCount) : null,
+  }
+}

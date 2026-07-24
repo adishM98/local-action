@@ -8,9 +8,29 @@ const GLYPH = {
   queued: '○',
 }
 
+const LABEL = {
+  success: 'Passed',
+  failed: 'Failed',
+  cancelled: 'Cancelled',
+  running: 'Running',
+  queued: 'Queued',
+}
+
 // Normalizes act's step/job results (success/failure/skipped) and run
 // statuses (success/failed/cancelled/running/queued) onto one icon set.
 export default function StatusIcon({ status }) {
   const s = status === 'failure' ? 'failed' : status === 'skipped' ? 'cancelled' : status || 'queued'
   return <span className={`status-icon status-icon--${s}`}>{GLYPH[status] || GLYPH[s] || '○'}</span>
+}
+
+// Pill variant for run rows and the run-detail header — denser contexts
+// (job/step lists) keep the bare glyph, which would be too heavy as pills.
+export function StatusBadge({ status }) {
+  const s = status === 'failure' ? 'failed' : status === 'skipped' ? 'cancelled' : status || 'queued'
+  return (
+    <span className={`status-badge status-badge--${s}`}>
+      <span className="status-icon">{GLYPH[status] || GLYPH[s] || '○'}</span>
+      {LABEL[s] || s}
+    </span>
+  )
 }

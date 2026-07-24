@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api.js'
-import StatusIcon from './StatusIcon.jsx'
+import { StatusBadge } from './StatusIcon.jsx'
 import RunWorkflowMenu from './RunWorkflowMenu.jsx'
-import { relativeTime, duration } from '../format.js'
+import { relativeTime, duration, formatDurationMs, computeRunStats } from '../format.js'
 
 export default function RunsView({ repoPath, workflows, workflowFile, health, onOpenRun, onOpenSecrets }) {
   const [runs, setRuns] = useState([])
@@ -57,11 +57,12 @@ export default function RunsView({ repoPath, workflows, workflowFile, health, on
         <div className="banner banner--warn">Docker is not running — workflow runs will fail.</div>
       )}
       {error && <p className="error">{error}</p>}
+      {visible.length > 0 && <StatCards runs={visible} />}
       <div className="run-rows">
         {visible.length === 0 && !error && <p className="empty-state">No runs yet.</p>}
         {visible.map((run) => (
           <button key={run.id} className="run-row" onClick={() => onOpenRun(run.id)}>
-            <StatusIcon status={run.status} />
+            <StatusBadge status={run.status} />
             <span className="run-row__main">
               <span className="run-row__name">
                 {wfName(run.workflowFile)} #{run.id}
@@ -73,6 +74,34 @@ export default function RunsView({ repoPath, workflows, workflowFile, health, on
             <span className="run-row__duration">{duration(run)}</span>
           </button>
         ))}
+      </div>
+    </div>
+  )
+}
+
+function StatCards({ runs }) {
+  const stats = computeRunStats(runs)
+  return (
+    <div className="stat-cards">
+      <div className="stat-card">
+        <span className="stat-card__value">{stats.total}</span>
+        <span className="stat-card__label">Runs</span>
+      </div>
+      <div className="stat-card stat-card--passed">
+        <span className="stat-card__value">{stats.passed}</span>
+        <span className="stat-card__label">Passed</span>
+      </div>
+      <div className="stat-card stat-card--failed">
+        <span className="stat-card__value">{stats.failed}</span>
+        <span className="stat-card__label">Failed</span>
+      </div>
+      <div className="stat-card stat-card--running">
+        <span className="stat-card__value">{stats.running}</span>
+        <span className="stat-card__label">Running</span>
+      </div>
+      <div className="stat-card">
+        <span className="stat-card__value">{stats.avgDurationMs != null ? formatDurationMs(stats.avgDurationMs) : '—'}</span>
+        <span className="stat-card__label">Avg duration</span>
       </div>
     </div>
   )
