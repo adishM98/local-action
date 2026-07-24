@@ -9,7 +9,7 @@ const TERMINAL = ['success', 'failed', 'cancelled']
 // While the run is live: WS streams lines, a 2s poll tracks status. On any
 // terminal poll the persisted log replaces the streamed lines wholesale, so
 // WS hiccups can't lose output — SQLite is the source of truth at the end.
-export default function RunDetail({ runId, onBack, onOpenRun }) {
+export default function RunDetail({ runId, onClose, onOpenRun }) {
   const [run, setRun] = useState(null)
   const [lines, setLines] = useState([])
   const [error, setError] = useState(null)
@@ -118,8 +118,8 @@ export default function RunDetail({ runId, onBack, onOpenRun }) {
 
   return (
     <div className="run-detail">
-      <button className="linklike" onClick={onBack}>
-        ← All runs
+      <button className="drawer__close" onClick={onClose} title="Close" aria-label="Close">
+        ✕
       </button>
       <div className="run-detail__head">
         <StatusBadge status={run?.status} />
@@ -179,13 +179,26 @@ function liveStatus(result, runStatus) {
 }
 
 function JobCard({ job, runStatus }) {
+  const running = job.result == null && runStatus === 'running'
+  const completedSteps = job.steps.filter((s) => s.result).length
+
   return (
     <section className="job-card">
       <header className="job-card__head">
         <StatusIcon status={liveStatus(job.result, runStatus)} />
         <h3>{job.name}</h3>
+        {running && job.steps.length > 0 && (
+          <span className="job-card__progress" title="Steps observed so far — the workflow's true total isn't known until it finishes">
+            Step {completedSteps}/{job.steps.length}
+          </span>
+        )}
         {job.durationMs != null && <span className="job-card__duration">{formatDurationMs(job.durationMs)}</span>}
       </header>
+      {running && job.steps.length > 0 && (
+        <div className="job-card__progress-bar">
+          <div className="job-card__progress-fill" style={{ width: `${(completedSteps / job.steps.length) * 100}%` }} />
+        </div>
+      )}
       {job.steps.map((step) => (
         <StepRow key={step.name} step={step} runStatus={runStatus} />
       ))}

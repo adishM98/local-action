@@ -22,7 +22,7 @@ function loadCollapsed() {
 export default function Sidebar({ workflows, scanState, view, onNavigate, repoPath, categories, onCategoryChange }) {
   const [collapsed, setCollapsed] = useState(loadCollapsed)
   const [search, setSearch] = useState('')
-  const inRuns = view.name === 'runs' || view.name === 'run'
+  const inRuns = view.name === 'runs'
 
   function toggleCategory(name) {
     setCollapsed((prev) => {

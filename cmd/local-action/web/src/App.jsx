@@ -5,6 +5,7 @@ import Sidebar from './components/Sidebar.jsx'
 import RunsView from './components/RunsView.jsx'
 import RunDetail from './components/RunDetail.jsx'
 import SecretsPage from './components/SecretsPage.jsx'
+import Drawer from './components/Drawer.jsx'
 
 export default function App() {
   const [repoPath, setRepoPath] = useState(localStorage.getItem('repoPath') || '')
@@ -13,6 +14,7 @@ export default function App() {
   const [scanState, setScanState] = useState({ scanned: false, error: null })
   const [view, setView] = useState({ name: 'runs', workflowFile: null })
   const [health, setHealth] = useState(null)
+  const [drawerRunId, setDrawerRunId] = useState(null)
 
   const checkHealth = useCallback(async () => {
     try {
@@ -91,15 +93,8 @@ export default function App() {
               workflows={workflows}
               workflowFile={view.workflowFile}
               health={health}
-              onOpenRun={(runId) => setView({ name: 'run', runId, workflowFile: view.workflowFile })}
+              onOpenRun={setDrawerRunId}
               onOpenSecrets={(workflowFile) => setView({ name: 'secrets', workflowFile })}
-            />
-          )}
-          {view.name === 'run' && (
-            <RunDetail
-              runId={view.runId}
-              onBack={() => setView({ name: 'runs', workflowFile: view.workflowFile || null })}
-              onOpenRun={(runId) => setView({ name: 'run', runId, workflowFile: view.workflowFile })}
             />
           )}
           {view.name === 'secrets' && (
@@ -111,6 +106,11 @@ export default function App() {
           )}
         </main>
       </div>
+      {drawerRunId && (
+        <Drawer onClose={() => setDrawerRunId(null)}>
+          <RunDetail runId={drawerRunId} onClose={() => setDrawerRunId(null)} onOpenRun={setDrawerRunId} />
+        </Drawer>
+      )}
     </div>
   )
 }
