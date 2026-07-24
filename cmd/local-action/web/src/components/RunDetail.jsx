@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api.js'
 import StatusIcon from './StatusIcon.jsx'
-import { relativeTime, duration } from '../format.js'
+import { relativeTime, duration, formatDurationMs } from '../format.js'
 import { parseLogLines } from '../logparse.js'
 
 const TERMINAL = ['success', 'failed', 'cancelled']
@@ -182,6 +182,7 @@ function JobCard({ job, runStatus }) {
       <header className="job-card__head">
         <StatusIcon status={liveStatus(job.result, runStatus)} />
         <h3>{job.name}</h3>
+        {job.durationMs != null && <span className="job-card__duration">{formatDurationMs(job.durationMs)}</span>}
       </header>
       {job.steps.map((step) => (
         <StepRow key={step.name} step={step} runStatus={runStatus} />
@@ -210,6 +211,7 @@ function StepRow({ step, runStatus }) {
         <span className="step__chevron">{open ? '▾' : '▸'}</span>
         <StatusIcon status={liveStatus(step.result, runStatus)} />
         <span className="step__name">{step.name}</span>
+        {step.durationMs != null && <span className="step__duration">{formatDurationMs(step.durationMs)}</span>}
       </button>
       {open && (
         <ol className="step__lines">

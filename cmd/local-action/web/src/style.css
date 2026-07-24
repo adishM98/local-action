@@ -242,6 +242,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   font-family: var(--mono);
   font-size: 12px;
 }
+.job-card__duration { margin-left: auto; color: var(--muted); font-size: 12px; white-space: nowrap; }
 
 .step { border-bottom: 1px solid var(--border); }
 .step:last-child { border-bottom: none; }
@@ -259,6 +260,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 .step__header:hover { background: var(--panel-2); }
 .step__chevron { color: var(--muted); width: 12px; }
 .step__name { font-size: 13px; }
+.step__duration { margin-left: auto; color: var(--muted); font-size: 12px; white-space: nowrap; }
 .step__lines {
   margin: 0;
   padding: 8px 14px 8px 0;

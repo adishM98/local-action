@@ -13,6 +13,14 @@ export function relativeTime(unixSeconds) {
   return `${Math.floor(delta / 86400)}d ago`
 }
 
+export function formatDurationMs(ms) {
+  if (ms == null) return ''
+  const totalSeconds = Math.round(ms / 1000)
+  const m = Math.floor(totalSeconds / 60)
+  const s = totalSeconds % 60
+  return m ? `${m}m ${s}s` : `${s}s`
+}
+
 export function duration(run) {
   const start = unwrap(run.startedAt)
   if (!start) return ''

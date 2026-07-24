@@ -32,6 +32,46 @@ test('groups lines into jobs and steps with results', () => {
   assert.equal(job.steps[1].lines.some((l) => l.text === 'hi'), true) // trailing \n stripped
 })
 
+test('step duration comes from executionTime (nanoseconds -> ms)', () => {
+  const lines = [
+    line({ msg: '⭐ Run Main echo hi', jobID: 'g', job: 'CI/g', step: 'echo hi', time: '2026-07-24T12:00:00Z' }),
+    line({
+      msg: '✅ Success - Main echo hi',
+      jobID: 'g',
+      job: 'CI/g',
+      step: 'echo hi',
+      stepResult: 'success',
+      executionTime: 60354791, // 60.354791ms
+      time: '2026-07-24T12:00:00.060Z',
+    }),
+  ]
+  const { jobs } = parseLogLines(lines)
+  assert.equal(jobs[0].steps[0].durationMs, 60)
+})
+
+test('step with no executionTime has null durationMs', () => {
+  const lines = [
+    line({ msg: '⭐ Run Main build', jobID: 'g', job: 'CI/g', step: 'build' }),
+  ]
+  const { jobs } = parseLogLines(lines)
+  assert.equal(jobs[0].steps[0].durationMs, null)
+})
+
+test('job duration spans first to last line for that job', () => {
+  const lines = [
+    line({ msg: 'start', jobID: 'g', job: 'CI/g', step: 'a', time: '2026-07-24T12:00:00Z' }),
+    line({ msg: 'end', jobID: 'g', job: 'CI/g', jobResult: 'success', time: '2026-07-24T12:00:05Z' }),
+  ]
+  const { jobs } = parseLogLines(lines)
+  assert.equal(jobs[0].durationMs, 5000)
+})
+
+test('job with no time fields has null durationMs', () => {
+  const lines = [line({ msg: '⭐ Run Main build', jobID: 'g', job: 'CI/g', step: 'build' })]
+  const { jobs } = parseLogLines(lines)
+  assert.equal(jobs[0].durationMs, null)
+})
+
 test('non-JSON lines land in other, order preserved', () => {
   const { jobs, other } = parseLogLines(['plain text', 'Error: something broke'])
   assert.equal(jobs.length, 0)

@@ -33,11 +33,19 @@ export function parseLogLines(lines) {
         steps: [],
         stepsByName: new Map(),
         tail: [],
+        durationMs: null,
+        firstTimeMs: null,
       }
       jobsById.set(entry.jobID, job)
       jobs.push(job)
     }
     if (entry.jobResult) job.result = entry.jobResult
+
+    const entryTimeMs = entry.time ? Date.parse(entry.time) : NaN
+    if (!Number.isNaN(entryTimeMs)) {
+      if (job.firstTimeMs == null) job.firstTimeMs = entryTimeMs
+      job.durationMs = entryTimeMs - job.firstTimeMs
+    }
 
     if (!entry.step) {
       job.tail.push({ no, text: msg })
@@ -45,13 +53,16 @@ export function parseLogLines(lines) {
     }
     let step = job.stepsByName.get(entry.step)
     if (!step) {
-      step = { name: entry.step, result: null, lines: [] }
+      step = { name: entry.step, result: null, lines: [], durationMs: null }
       job.stepsByName.set(entry.step, step)
       job.steps.push(step)
     }
     step.lines.push({ no, text: msg })
     if (entry.stepResult) step.result = entry.stepResult
+    if (typeof entry.executionTime === 'number') {
+      step.durationMs = Math.round(entry.executionTime / 1e6)
+    }
   })
 
-  return { jobs: jobs.map(({ stepsByName, ...job }) => job), other }
+  return { jobs: jobs.map(({ stepsByName, firstTimeMs, ...job }) => job), other }
 }
