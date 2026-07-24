@@ -11,7 +11,6 @@ export default function RunWorkflowMenu({ repoPath, workflow, onStarted, onOpenS
   const [payloadOpen, setPayloadOpen] = useState(false)
   const [payload, setPayload] = useState('')
   const [payloadError, setPayloadError] = useState(null)
-  const [autoDetected, setAutoDetected] = useState(false)
   const ref = useRef(null)
 
   useEffect(() => {
@@ -34,34 +33,24 @@ export default function RunWorkflowMenu({ repoPath, workflow, onStarted, onOpenS
       .catch(() => setCounts(null))
   }, [open, repoPath, workflow.file])
 
-  // No saved payload yet? Fall back to the workflow's auto-detected one
-  // (derived server-side from a solvable if: condition) so a labeled/PR-
-  // gated job just runs, instead of requiring the user to hand-write JSON.
+  // Manual entry is only needed when the workflow's if: condition couldn't
+  // be auto-solved server-side. When it was solved, there's nothing to
+  // show or fetch — the derived payload is used directly on run.
+  const autoPayload = workflow.autoEventPayload || ''
+
   useEffect(() => {
-    if (!open) return
+    if (!open || autoPayload) return
     api
       .getEventPayload(repoPath, workflow.file)
-      .then((result) => {
-        const saved = result?.payload || ''
-        if (saved) {
-          setPayload(saved)
-          setAutoDetected(false)
-        } else if (workflow.autoEventPayload) {
-          setPayload(workflow.autoEventPayload)
-          setAutoDetected(true)
-        } else {
-          setPayload('')
-          setAutoDetected(false)
-        }
-      })
+      .then((result) => setPayload(result?.payload || ''))
       .catch(() => setPayload(''))
-  }, [open, repoPath, workflow.file])
+  }, [open, repoPath, workflow.file, autoPayload])
 
   async function run() {
-    const trimmed = payload.trim()
-    if (trimmed) {
+    const manual = payload.trim()
+    if (!autoPayload && manual) {
       try {
-        JSON.parse(trimmed)
+        JSON.parse(manual)
       } catch {
         setPayloadError('Not valid JSON')
         setPayloadOpen(true)
@@ -72,13 +61,15 @@ export default function RunWorkflowMenu({ repoPath, workflow, onStarted, onOpenS
     setStarting(true)
     setError(null)
     try {
-      await api.saveEventPayload(repoPath, workflow.file, trimmed)
+      if (!autoPayload) {
+        await api.saveEventPayload(repoPath, workflow.file, manual)
+      }
       const { runId } = await api.createRun({
         repoPath,
         workflowFile: workflow.file,
         event,
         inputs,
-        eventPayload: trimmed,
+        eventPayload: autoPayload || manual,
       })
       setOpen(false)
       onStarted(runId)
@@ -135,32 +126,29 @@ export default function RunWorkflowMenu({ repoPath, workflow, onStarted, onOpenS
               {input.description && <small>{input.description}</small>}
             </label>
           ))}
-          <div className="disclosure">
-            <button className="linklike" onClick={() => setPayloadOpen(!payloadOpen)}>
-              Event payload (JSON) {payloadOpen ? '▾' : '▸'}
-            </button>
-            {payloadOpen && (
-              <div className="field">
-                <textarea
-                  className="event-payload-input"
-                  rows={4}
-                  placeholder={'{\n  "action": "labeled",\n  "label": { "name": "run-ci" }\n}'}
-                  value={payload}
-                  onChange={(e) => {
-                    setPayload(e.target.value)
-                    setPayloadError(null)
-                    setAutoDetected(false)
-                  }}
-                />
-                <small>
-                  {autoDetected
-                    ? "Auto-detected from this workflow's if: condition — edit or clear for a different scenario."
-                    : 'Fills github.event.* so if: conditions gated on event data can run locally.'}
-                </small>
-                {payloadError && <p className="error">{payloadError}</p>}
-              </div>
-            )}
-          </div>
+          {!autoPayload && (
+            <div className="disclosure">
+              <button className="linklike" onClick={() => setPayloadOpen(!payloadOpen)}>
+                Event payload (JSON) {payloadOpen ? '▾' : '▸'}
+              </button>
+              {payloadOpen && (
+                <div className="field">
+                  <textarea
+                    className="event-payload-input"
+                    rows={4}
+                    placeholder={'{\n  "action": "labeled",\n  "label": { "name": "run-ci" }\n}'}
+                    value={payload}
+                    onChange={(e) => {
+                      setPayload(e.target.value)
+                      setPayloadError(null)
+                    }}
+                  />
+                  <small>Fills github.event.* so if: conditions gated on event data can run locally.</small>
+                  {payloadError && <p className="error">{payloadError}</p>}
+                </div>
+              )}
+            </div>
+          )}
           {counts && (
             <p>
               <button className="linklike" onClick={() => onOpenSecrets(workflow.file)}>
