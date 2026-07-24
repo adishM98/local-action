@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 func newTestRouter(t *testing.T, actStub string) (*http.ServeMux, *sql.DB, string) {
@@ -189,5 +190,60 @@ func TestAPI_WorkflowScopedSecrets(t *testing.T) {
 	resp.Body.Close()
 	if len(entries) != 1 || entries[0].WorkflowFile != "" {
 		t.Fatalf("expected only the repo-wide entry to remain, got %+v", entries)
+	}
+}
+
+func TestAPI_HealthDockerErrorFromStderr(t *testing.T) {
+	stubDir := t.TempDir()
+	stubPath := filepath.Join(stubDir, "fake-act.sh")
+	if err := os.WriteFile(stubPath, []byte("#!/bin/sh\necho act version stub\n"), 0755); err != nil {
+		t.Fatalf("write act stub: %v", err)
+	}
+	// A fake docker on PATH that prints noise to stdout and the real error
+	// to stderr, then fails — mimics `docker info` with a dead daemon.
+	if err := os.WriteFile(filepath.Join(stubDir, "docker"), []byte(
+		"#!/bin/sh\necho 'Client: noise that must not appear'\necho 'Cannot connect to the Docker daemon' >&2\nexit 1\n",
+	), 0755); err != nil {
+		t.Fatalf("write docker stub: %v", err)
+	}
+	t.Setenv("PATH", stubDir)
+
+	mux, _, _ := newTestRouter(t, stubPath)
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/api/health")
+	if err != nil {
+		t.Fatalf("health: %v", err)
+	}
+	defer resp.Body.Close()
+	var body map[string]any
+	json.NewDecoder(resp.Body).Decode(&body)
+	if body["dockerOK"] != false {
+		t.Fatalf("expected dockerOK false, got %v", body["dockerOK"])
+	}
+	got, _ := body["dockerError"].(string)
+	if !strings.Contains(got, "Cannot connect to the Docker daemon") {
+		t.Fatalf("expected stderr error in dockerError, got %q", got)
+	}
+	if strings.Contains(got, "noise") {
+		t.Fatalf("stdout noise leaked into dockerError: %q", got)
+	}
+}
+
+func TestTruncateTail(t *testing.T) {
+	if got := truncateTail("short", 300); got != "short" {
+		t.Fatalf("short string changed: %q", got)
+	}
+	long := strings.Repeat("x", 400) + "tail-end"
+	got := truncateTail(long, 300)
+	if len(got) > 300 || !strings.HasSuffix(got, "tail-end") {
+		t.Fatalf("tail not kept: len=%d %q", len(got), got[:20])
+	}
+	// multi-byte boundary: é is 2 bytes; ensure result is valid UTF-8
+	multi := strings.Repeat("é", 200) // 400 bytes
+	got = truncateTail(multi, 301)    // 301 would split a rune without the boundary scan
+	if !utf8.ValidString(got) {
+		t.Fatal("truncateTail produced invalid UTF-8")
 	}
 }

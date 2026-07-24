@@ -1,15 +1,18 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"os/exec"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -30,7 +33,12 @@ func NewRouter(db *sql.DB, key []byte, engine *Engine, hub *Hub, actBin string) 
 		defer cancel()
 
 		actOut, actErr := exec.CommandContext(ctx, actBin, "--version").CombinedOutput()
-		dockerOut, dockerErr := exec.CommandContext(ctx, "docker", "info").CombinedOutput()
+
+		var dockerStderr bytes.Buffer
+		dockerCmd := exec.CommandContext(ctx, "docker", "info")
+		dockerCmd.Stdout = io.Discard
+		dockerCmd.Stderr = &dockerStderr
+		dockerErr := dockerCmd.Run()
 
 		resp := map[string]any{
 			"actOK":      actErr == nil,
@@ -38,14 +46,13 @@ func NewRouter(db *sql.DB, key []byte, engine *Engine, hub *Hub, actBin string) 
 			"dockerOK":   dockerErr == nil,
 		}
 		if dockerErr != nil {
-			msg := strings.TrimSpace(string(dockerOut))
-			if msg == "" {
+			msg := strings.TrimSpace(dockerStderr.String())
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				msg = "docker info timed out (daemon may be starting)"
+			} else if msg == "" {
 				msg = dockerErr.Error()
 			}
-			if len(msg) > 300 {
-				msg = msg[:300]
-			}
-			resp["dockerError"] = msg
+			resp["dockerError"] = truncateTail(msg, 300)
 		}
 		writeJSON(w, http.StatusOK, resp)
 	})
@@ -198,4 +205,19 @@ func NewRouter(db *sql.DB, key []byte, engine *Engine, hub *Hub, actBin string) 
 	})
 
 	return mux
+}
+
+// truncateTail keeps the LAST max bytes of s (the tail carries the real
+// error in multi-line CLI output), trimmed to a rune boundary.
+func truncateTail(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	s = s[len(s)-max:]
+	for i := 0; i < len(s); i++ {
+		if utf8.RuneStart(s[i]) {
+			return s[i:]
+		}
+	}
+	return s
 }
