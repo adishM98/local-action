@@ -16,9 +16,10 @@ export const api = {
   scan: (path) => request('POST', '/api/scan', { path }),
   listSecrets: (repoPath, kind) =>
     request('GET', `/api/secrets?repoPath=${encodeURIComponent(repoPath)}&kind=${kind}`),
-  upsertSecret: (repoPath, kind, key, value) =>
-    request('POST', '/api/secrets', { repoPath, kind, key, value }),
-  deleteSecret: (repoPath, kind, key) => request('DELETE', '/api/secrets', { repoPath, kind, key }),
+  upsertSecret: (repoPath, kind, key, value, workflowFile = '') =>
+    request('POST', '/api/secrets', { repoPath, kind, key, value, workflowFile }),
+  deleteSecret: (repoPath, kind, key, workflowFile = '') =>
+    request('DELETE', '/api/secrets', { repoPath, kind, key, workflowFile }),
   createRun: (payload) => request('POST', '/api/runs', payload),
   listRuns: (repoPath) => request('GET', `/api/runs?repoPath=${encodeURIComponent(repoPath)}`),
   getRun: (id) => request('GET', `/api/runs/${id}`),
