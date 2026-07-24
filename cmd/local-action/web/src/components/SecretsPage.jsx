@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../api.js'
 
 export default function SecretsPage({ repoPath, workflows, initialWorkflowFilter }) {
@@ -9,6 +9,7 @@ export default function SecretsPage({ repoPath, workflows, initialWorkflowFilter
   const [value, setValue] = useState('')
   const [scope, setScope] = useState(initialWorkflowFilter || '')
   const [error, setError] = useState(null)
+  const valueRef = useRef(null)
 
   async function load() {
     if (!repoPath) return
@@ -54,6 +55,20 @@ export default function SecretsPage({ repoPath, workflows, initialWorkflowFilter
   const visible = filter ? entries.filter((e) => !e.workflowFile || e.workflowFile === filter) : entries
   const wfName = (file) => workflows.find((w) => w.file === file)?.name || file
 
+  const filteredWorkflow = filter ? workflows.find((w) => w.file === filter) : null
+  const detected = (kind === 'secret' ? filteredWorkflow?.usedSecrets : filteredWorkflow?.usedVars) || []
+  const storedNames = new Set(
+    entries.filter((e) => !e.workflowFile || e.workflowFile === filter).map((e) => e.key),
+  )
+  const chips = detected.filter((n) => !storedNames.has(n))
+
+  function quickAdd(detectedName) {
+    setName(detectedName)
+    setScope(filter)
+    setValue('')
+    valueRef.current?.focus()
+  }
+
   return (
     <div className="secrets-page">
       <h2>Secrets and variables</h2>
@@ -76,6 +91,18 @@ export default function SecretsPage({ repoPath, workflows, initialWorkflowFilter
               </option>
             ))}
           </select>
+        </div>
+      )}
+      {chips.length > 0 && (
+        <div className="detected-chips">
+          <span>Detected in this workflow — click to add:</span>
+          <div className="detected-chips__row">
+            {chips.map((n) => (
+              <button key={n} className="chip" onClick={() => quickAdd(n)}>
+                + {n}
+              </button>
+            ))}
+          </div>
         </div>
       )}
       {error && <p className="error">{error}</p>}
@@ -120,7 +147,12 @@ export default function SecretsPage({ repoPath, workflows, initialWorkflowFilter
       </div>
       <div className="field">
         <span>Value</span>
-        <input placeholder="value (write-only after save)" value={value} onChange={(e) => setValue(e.target.value)} />
+        <input
+          ref={valueRef}
+          placeholder="value (write-only after save)"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+        />
       </div>
       <div className="field">
         <span>Scope</span>

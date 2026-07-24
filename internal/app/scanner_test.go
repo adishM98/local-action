@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -16,6 +17,103 @@ func writeWorkflow(t *testing.T, repoPath, filename, content string) {
 	}
 	if err := os.WriteFile(filepath.Join(dir, filename), []byte(content), 0644); err != nil {
 		t.Fatalf("write workflow: %v", err)
+	}
+}
+
+func TestParseWorkflowFile_DetectsSecretsAndVarsAnywhereInFile(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "deploy.yml", `name: Deploy
+on: push
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      REGION: ${{ vars.AWS_REGION }}
+    steps:
+      - run: |
+          curl -H "Authorization: ${{ secrets.API_TOKEN }}"
+      - uses: some/action@v1
+        with:
+          password: ${{ secrets.REGISTRY_PW }}
+      - run: echo ${{ secrets.API_TOKEN }}
+`)
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	wf := workflows[0]
+	wantSecrets := []string{"API_TOKEN", "REGISTRY_PW"}
+	if !reflect.DeepEqual(wf.UsedSecrets, wantSecrets) {
+		t.Errorf("UsedSecrets: got %v, want %v (deduped+sorted)", wf.UsedSecrets, wantSecrets)
+	}
+	wantVars := []string{"AWS_REGION"}
+	if !reflect.DeepEqual(wf.UsedVars, wantVars) {
+		t.Errorf("UsedVars: got %v, want %v", wf.UsedVars, wantVars)
+	}
+}
+
+func TestParseWorkflowFile_ExcludesGithubToken(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", `name: CI
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - run: echo ${{ secrets.NPM_TOKEN }}
+`)
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	wf := workflows[0]
+	if !reflect.DeepEqual(wf.UsedSecrets, []string{"NPM_TOKEN"}) {
+		t.Errorf("expected GITHUB_TOKEN excluded, got %v", wf.UsedSecrets)
+	}
+}
+
+func TestParseWorkflowFile_NoReferencesYieldsEmptySlice(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", "name: CI\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps: []\n")
+
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	wf := workflows[0]
+	if len(wf.UsedSecrets) != 0 || len(wf.UsedVars) != 0 {
+		t.Errorf("expected no detected secrets/vars, got secrets=%v vars=%v", wf.UsedSecrets, wf.UsedVars)
+	}
+	b, err := json.Marshal(wf)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if strings.Contains(string(b), `"usedSecrets"`) || strings.Contains(string(b), `"usedVars"`) {
+		t.Errorf("expected omitempty to drop empty usedSecrets/usedVars, got %s", b)
+	}
+}
+
+func TestParseWorkflowFile_IgnoresMalformedReferences(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", `name: CI
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ${{ secrets['BRACKET_STYLE'] }}
+      - run: echo ${{secrets.NO_SPACE}}
+`)
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	wf := workflows[0]
+	if !reflect.DeepEqual(wf.UsedSecrets, []string{"NO_SPACE"}) {
+		t.Errorf("expected only NO_SPACE (bracket-style skipped), got %v", wf.UsedSecrets)
 	}
 }
 

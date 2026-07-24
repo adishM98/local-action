@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -15,7 +17,31 @@ type WorkflowInfo struct {
 	Name           string          `json:"name"`
 	Events         []string        `json:"events"`
 	DispatchInputs []DispatchInput `json:"dispatchInputs,omitempty"`
+	UsedSecrets    []string        `json:"usedSecrets,omitempty"`
+	UsedVars       []string        `json:"usedVars,omitempty"`
 	ParseError     string          `json:"parseError,omitempty"`
+}
+
+var (
+	secretRefRe = regexp.MustCompile(`\$\{\{\s*secrets\.([A-Za-z_][A-Za-z0-9_]*)\s*\}\}`)
+	varRefRe    = regexp.MustCompile(`\$\{\{\s*vars\.([A-Za-z_][A-Za-z0-9_]*)\s*\}\}`)
+)
+
+// findRefs returns the deduped, sorted set of names captured by re's first
+// group across data, skipping any name in exclude.
+func findRefs(re *regexp.Regexp, data []byte, exclude map[string]bool) []string {
+	seen := map[string]bool{}
+	var names []string
+	for _, m := range re.FindAllSubmatch(data, -1) {
+		name := string(m[1])
+		if exclude[name] || seen[name] {
+			continue
+		}
+		seen[name] = true
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 type DispatchInput struct {
@@ -73,6 +99,8 @@ func ParseWorkflowFile(path string) (WorkflowInfo, error) {
 		return WorkflowInfo{}, err
 	}
 	info := WorkflowInfo{Name: filepath.Base(path)}
+	info.UsedSecrets = findRefs(secretRefRe, data, map[string]bool{"GITHUB_TOKEN": true})
+	info.UsedVars = findRefs(varRefRe, data, nil)
 
 	var doc yaml.Node
 	if err := yaml.Unmarshal(data, &doc); err != nil {

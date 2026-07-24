@@ -309,6 +309,21 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 }
 .scope-badge--wf { color: var(--blue); border-color: var(--blue); }
 
+.detected-chips { margin-bottom: 16px; font-size: 13px; }
+.detected-chips > span { color: var(--muted); }
+.detected-chips__row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.chip {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 12px;
+  font-size: 12px;
+  font-family: var(--mono);
+  color: var(--text);
+  cursor: pointer;
+}
+.chip:hover { border-color: var(--blue); color: var(--blue); }
+
 /* ── Misc ────────────────────────────────────────────── */
 .error { color: var(--red); font-size: 13px; }
 .empty-state { color: var(--muted); padding: 24px 0; }
