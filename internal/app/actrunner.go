@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -204,20 +205,20 @@ func (e *Engine) failEarly(runID int64, started int64, cause error) {
 }
 
 func (e *Engine) writeTempFiles(req RunRequest) (secretFile, varFile string, cleanup func(), err error) {
-	secrets, err := ListSecrets(e.db, req.RepoPath, KindSecret)
+	secrets, err := SecretsForRun(e.db, e.key, req.RepoPath, req.WorkflowFile, KindSecret)
 	if err != nil {
 		return "", "", nil, err
 	}
-	vars, err := ListSecrets(e.db, req.RepoPath, KindVar)
+	vars, err := SecretsForRun(e.db, e.key, req.RepoPath, req.WorkflowFile, KindVar)
 	if err != nil {
 		return "", "", nil, err
 	}
 
-	sf, err := e.writeDotenvTemp("act-secrets-*.env", req.RepoPath, secrets, req.ExtraSecrets)
+	sf, err := writeDotenvTemp("act-secrets-*.env", secrets, req.ExtraSecrets)
 	if err != nil {
 		return "", "", nil, err
 	}
-	vf, err := e.writeDotenvTemp("act-vars-*.env", req.RepoPath, vars, req.ExtraVars)
+	vf, err := writeDotenvTemp("act-vars-*.env", vars, req.ExtraVars)
 	if err != nil {
 		os.Remove(sf)
 		return "", "", nil, err
@@ -229,7 +230,7 @@ func (e *Engine) writeTempFiles(req RunRequest) (secretFile, varFile string, cle
 	return sf, vf, cleanup, nil
 }
 
-func (e *Engine) writeDotenvTemp(pattern, repoPath string, entries []SecretEntry, extra map[string]string) (string, error) {
+func writeDotenvTemp(pattern string, values, extra map[string]string) (string, error) {
 	f, err := os.CreateTemp("", pattern)
 	if err != nil {
 		return "", err
@@ -245,12 +246,13 @@ func (e *Engine) writeDotenvTemp(pattern, repoPath string, entries []SecretEntry
 	if err := f.Chmod(0600); err != nil {
 		return "", err
 	}
-	for _, entry := range entries {
-		val, err := GetSecretValue(e.db, e.key, repoPath, entry.Kind, entry.Key)
-		if err != nil {
-			return "", err
-		}
-		fmt.Fprintf(f, "%s=%s\n", entry.Key, val)
+	keys := make([]string, 0, len(values))
+	for k := range values {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		fmt.Fprintf(f, "%s=%s\n", k, values[k])
 	}
 	for k, v := range extra {
 		fmt.Fprintf(f, "%s=%s\n", k, v)

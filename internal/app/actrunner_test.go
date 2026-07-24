@@ -197,56 +197,6 @@ func TestEngine_Cancel(t *testing.T) {
 	t.Fatal("expected run to be cancelled/failed within 2s of Cancel")
 }
 
-func TestWriteDotenvTemp_CleansUpTempFileOnError(t *testing.T) {
-	dir := t.TempDir()
-	db, err := OpenDB(filepath.Join(dir, "test.db"))
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
-	defer db.Close()
-
-	key := make([]byte, keySize)
-	repoPath := dir
-
-	// A valid secret that sorts before the corrupted one, so the write loop
-	// gets partway through (writing plaintext to the temp file) before
-	// GetSecretValue fails on the second entry.
-	if err := UpsertSecret(db, key, repoPath, KindSecret, "AAA_GOOD", "good-value"); err != nil {
-		t.Fatalf("upsert good secret: %v", err)
-	}
-	// Insert a secret with corrupted ciphertext directly via the DB so that
-	// GetSecretValue's Decrypt call fails mid-loop.
-	if _, err := db.Exec(
-		`INSERT INTO secrets (repo_path, kind, key, value_encrypted) VALUES (?, ?, ?, ?)`,
-		repoPath, string(KindSecret), "BBB_BAD", []byte("short"),
-	); err != nil {
-		t.Fatalf("insert corrupted secret: %v", err)
-	}
-
-	entries, err := ListSecrets(db, repoPath, KindSecret)
-	if err != nil {
-		t.Fatalf("list secrets: %v", err)
-	}
-	if len(entries) != 2 {
-		t.Fatalf("expected 2 secret entries, got %d", len(entries))
-	}
-
-	pattern := filepath.Join(os.TempDir(), "act-secrets-leak-test-*.env")
-	before, _ := filepath.Glob(pattern)
-
-	e := &Engine{db: db, key: key}
-	name, err := e.writeDotenvTemp("act-secrets-leak-test-*.env", repoPath, entries, nil)
-	if err == nil {
-		os.Remove(name)
-		t.Fatal("expected writeDotenvTemp to fail for corrupted secret value")
-	}
-
-	after, _ := filepath.Glob(pattern)
-	if len(after) > len(before) {
-		t.Fatalf("expected no leaked temp file after error, before=%v after=%v", before, after)
-	}
-}
-
 func waitForStatus(t *testing.T, db *sql.DB, runID int64, want RunStatus) {
 	t.Helper()
 	deadline := time.Now().Add(3 * time.Second)

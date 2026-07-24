@@ -76,7 +76,7 @@ func NewRouter(db *sql.DB, key []byte, engine *Engine, hub *Hub, actBin string) 
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if err := UpsertSecret(db, key, body.RepoPath, body.Kind, body.Key, body.Value); err != nil {
+		if err := UpsertSecret(db, key, body.RepoPath, body.Kind, body.Key, body.Value, ""); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -93,7 +93,7 @@ func NewRouter(db *sql.DB, key []byte, engine *Engine, hub *Hub, actBin string) 
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if err := DeleteSecret(db, body.RepoPath, body.Kind, body.Key); err != nil {
+		if err := DeleteSecret(db, body.RepoPath, body.Kind, body.Key, ""); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
