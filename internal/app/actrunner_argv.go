@@ -15,7 +15,7 @@ type RunRequest struct {
 }
 
 func BuildArgv(req RunRequest, secretFile, varFile string) []string {
-	argv := []string{req.Event, "-W", req.WorkflowFile, "--secret-file", secretFile, "--var-file", varFile}
+	argv := []string{req.Event, "-W", req.WorkflowFile, "--json", "--secret-file", secretFile, "--var-file", varFile}
 
 	keys := make([]string, 0, len(req.Inputs))
 	for k := range req.Inputs {
