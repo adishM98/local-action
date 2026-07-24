@@ -64,7 +64,8 @@ func OpenDB(path string) (*sql.DB, error) {
 
 // migrateSecretsWorkflowFile upgrades a pre-workflow_file secrets table in
 // place. Old rows become repo-wide (workflow_file = ''). SQLite can't add a
-// column into an existing PRIMARY KEY, so we rebuild the table.
+// column into an existing PRIMARY KEY, so we rebuild the table. The rebuild
+// is wrapped in a transaction to ensure all-or-nothing semantics on crash.
 func migrateSecretsWorkflowFile(db *sql.DB) error {
 	var count int
 	err := db.QueryRow(
@@ -76,7 +77,12 @@ func migrateSecretsWorkflowFile(db *sql.DB) error {
 	if count > 0 {
 		return nil
 	}
-	_, err = db.Exec(`
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`
 		ALTER TABLE secrets RENAME TO secrets_old;
 		CREATE TABLE secrets (
 		  repo_path TEXT NOT NULL,
@@ -89,6 +95,8 @@ func migrateSecretsWorkflowFile(db *sql.DB) error {
 		INSERT INTO secrets (repo_path, kind, key, workflow_file, value_encrypted)
 		  SELECT repo_path, kind, key, '', value_encrypted FROM secrets_old;
 		DROP TABLE secrets_old;
-	`)
-	return err
+	`); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
