@@ -10,11 +10,12 @@ import Drawer from './components/Drawer.jsx'
 export default function App() {
   const [repoPath, setRepoPath] = useState(localStorage.getItem('repoPath') || '')
   const [workflows, setWorkflows] = useState([])
-  const [categories, setCategories] = useState({})
   const [scanState, setScanState] = useState({ scanned: false, error: null })
   const [view, setView] = useState({ name: 'runs', workflowFile: null })
   const [health, setHealth] = useState(null)
   const [drawerRunId, setDrawerRunId] = useState(null)
+  const [runs, setRuns] = useState([])
+  const [runsError, setRunsError] = useState(null)
 
   const checkHealth = useCallback(async () => {
     try {
@@ -47,17 +48,36 @@ export default function App() {
       setWorkflows([])
       setScanState({ scanned: true, error: err.message })
     }
-    try {
-      setCategories((await api.getWorkflowCategories(path)) || {})
-    } catch {
-      setCategories({})
-    }
   }, [])
 
   useEffect(() => {
     scan(repoPath)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // initial scan for the remembered path only; later scans go through commitRepoPath
+
+  // Polled here (not inside RunsView) so the sidebar's per-workflow
+  // last-run-status icons share the same fetch instead of duplicating it.
+  useEffect(() => {
+    if (!repoPath) return
+    let cancelled = false
+    async function load() {
+      try {
+        const result = await api.listRuns(repoPath)
+        if (!cancelled) {
+          setRuns(result || [])
+          setRunsError(null)
+        }
+      } catch (err) {
+        if (!cancelled) setRunsError(err.message)
+      }
+    }
+    load()
+    const interval = setInterval(load, 2000)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [repoPath])
 
   function commitRepoPath(path) {
     setRepoPath(path)
@@ -70,22 +90,7 @@ export default function App() {
     <div className="app">
       <TopBar repoPath={repoPath} onCommit={commitRepoPath} health={health} onRecheck={checkHealth} />
       <div className="shell">
-        <Sidebar
-          workflows={workflows}
-          scanState={scanState}
-          view={view}
-          onNavigate={setView}
-          repoPath={repoPath}
-          categories={categories}
-          onCategoryChange={(file, category) =>
-            setCategories((prev) => {
-              const next = { ...prev }
-              if (category) next[file] = category
-              else delete next[file]
-              return next
-            })
-          }
-        />
+        <Sidebar workflows={workflows} scanState={scanState} view={view} onNavigate={setView} runs={runs} />
         <main className="content">
           {view.name === 'runs' && (
             <RunsView
@@ -93,6 +98,8 @@ export default function App() {
               workflows={workflows}
               workflowFile={view.workflowFile}
               health={health}
+              runs={runs}
+              runsError={runsError}
               onOpenRun={setDrawerRunId}
               onOpenSecrets={(workflowFile) => setView({ name: 'secrets', workflowFile })}
             />

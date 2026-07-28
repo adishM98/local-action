@@ -39,6 +39,7 @@ export function computeRunStats(runs) {
   let passed = 0
   let failed = 0
   let running = 0
+  let cancelled = 0
   let finishedCount = 0
   let finishedTotalMs = 0
 
@@ -46,6 +47,7 @@ export function computeRunStats(runs) {
     if (run.status === 'success') passed++
     else if (run.status === 'failed') failed++
     else if (run.status === 'running') running++
+    else if (run.status === 'cancelled') cancelled++
 
     const start = unwrap(run.startedAt)
     const end = unwrap(run.finishedAt)
@@ -60,8 +62,24 @@ export function computeRunStats(runs) {
     passed,
     failed,
     running,
+    cancelled,
     avgDurationMs: finishedCount ? Math.round(finishedTotalMs / finishedCount) : null,
   }
+}
+
+const BRANCH_COLORS = ['blue', 'purple', 'green', 'orange', 'pink']
+
+// branchColorClass deterministically maps a branch name to one of a small
+// fixed palette (same branch always renders the same color; different
+// branches usually land on different ones) — a CSS class suffix for
+// .branch-pill--<color>. No color for an empty branch (nothing to render).
+export function branchColorClass(branch) {
+  if (!branch) return ''
+  let hash = 0
+  for (let i = 0; i < branch.length; i++) {
+    hash = (hash * 31 + branch.charCodeAt(i)) | 0
+  }
+  return BRANCH_COLORS[Math.abs(hash) % BRANCH_COLORS.length]
 }
 
 // filterRuns applies the runs-list toolbar filters. search matches

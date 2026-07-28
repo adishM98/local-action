@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { formatDurationMs, computeRunStats, filterRuns } from './format.js'
+import { formatDurationMs, computeRunStats, filterRuns, branchColorClass } from './format.js'
 
 const run = (status, startedAt, finishedAt) => ({
   status,
@@ -10,7 +10,7 @@ const run = (status, startedAt, finishedAt) => ({
 
 test('computeRunStats: empty runs list', () => {
   const stats = computeRunStats([])
-  assert.deepEqual(stats, { total: 0, passed: 0, failed: 0, running: 0, avgDurationMs: null })
+  assert.deepEqual(stats, { total: 0, passed: 0, failed: 0, running: 0, cancelled: 0, avgDurationMs: null })
 })
 
 test('computeRunStats: counts by status', () => {
@@ -26,6 +26,7 @@ test('computeRunStats: counts by status', () => {
   assert.equal(stats.passed, 2)
   assert.equal(stats.failed, 1)
   assert.equal(stats.running, 1)
+  assert.equal(stats.cancelled, 1)
 })
 
 test('computeRunStats: avgDurationMs only over finished runs (excludes running)', () => {
@@ -73,6 +74,19 @@ test('filterRuns: status and event filters combine with search (AND)', () => {
   assert.deepEqual(filterRuns(runs, { search: '', status: 'success', event: '' }, nameFor), [runs[0], runs[2]])
   assert.deepEqual(filterRuns(runs, { search: '', status: '', event: 'push' }, nameFor), [runs[0], runs[1]])
   assert.deepEqual(filterRuns(runs, { search: '', status: 'success', event: 'push' }, nameFor), [runs[0]])
+})
+
+test('branchColorClass: deterministic (same branch, same color)', () => {
+  assert.equal(branchColorClass('main'), branchColorClass('main'))
+})
+
+test('branchColorClass: different names can get different colors', () => {
+  const classes = new Set(['main', 'develop', 'feature/x', 'release/1.0', 'hotfix'].map(branchColorClass))
+  assert.ok(classes.size > 1, 'expected more than one distinct color across 5 different branch names')
+})
+
+test('branchColorClass: empty branch has no class', () => {
+  assert.equal(branchColorClass(''), '')
 })
 
 test('filterRuns: branch filter', () => {
