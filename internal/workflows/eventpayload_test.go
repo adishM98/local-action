@@ -1,4 +1,4 @@
-package app
+package workflows
 
 import (
 	"path/filepath"

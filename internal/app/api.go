@@ -15,6 +15,7 @@ import (
 	"unicode/utf8"
 
 	"local-action/internal/secrets"
+	"local-action/internal/workflows"
 	"local-action/internal/ws"
 )
 
@@ -68,12 +69,12 @@ func NewRouter(db *sql.DB, key []byte, engine *Engine, hub *ws.Hub, actBin strin
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		workflows, err := ScanWorkflows(body.Path)
+		workflowList, err := workflows.ScanWorkflows(body.Path)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		writeJSON(w, http.StatusOK, workflows)
+		writeJSON(w, http.StatusOK, workflowList)
 	})
 
 	mux.HandleFunc("GET /api/secrets", func(w http.ResponseWriter, r *http.Request) {
@@ -161,7 +162,7 @@ func NewRouter(db *sql.DB, key []byte, engine *Engine, hub *ws.Hub, actBin strin
 	mux.HandleFunc("GET /api/event-payload", func(w http.ResponseWriter, r *http.Request) {
 		repoPath := r.URL.Query().Get("repoPath")
 		workflowFile := r.URL.Query().Get("workflowFile")
-		payload, err := GetEventPayload(db, repoPath, workflowFile)
+		payload, err := workflows.GetEventPayload(db, repoPath, workflowFile)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -183,7 +184,7 @@ func NewRouter(db *sql.DB, key []byte, engine *Engine, hub *ws.Hub, actBin strin
 			http.Error(w, "payload is not valid JSON", http.StatusBadRequest)
 			return
 		}
-		if err := SaveEventPayload(db, body.RepoPath, body.WorkflowFile, body.Payload); err != nil {
+		if err := workflows.SaveEventPayload(db, body.RepoPath, body.WorkflowFile, body.Payload); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -192,7 +193,7 @@ func NewRouter(db *sql.DB, key []byte, engine *Engine, hub *ws.Hub, actBin strin
 
 	mux.HandleFunc("GET /api/workflow-categories", func(w http.ResponseWriter, r *http.Request) {
 		repoPath := r.URL.Query().Get("repoPath")
-		categories, err := GetWorkflowCategories(db, repoPath)
+		categories, err := workflows.GetWorkflowCategories(db, repoPath)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -210,7 +211,7 @@ func NewRouter(db *sql.DB, key []byte, engine *Engine, hub *ws.Hub, actBin strin
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if err := SaveWorkflowCategory(db, body.RepoPath, body.WorkflowFile, body.Category); err != nil {
+		if err := workflows.SaveWorkflowCategory(db, body.RepoPath, body.WorkflowFile, body.Category); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}

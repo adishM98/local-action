@@ -15,6 +15,7 @@ import (
 
 	"local-action/internal/db"
 	"local-action/internal/secrets"
+	"local-action/internal/workflows"
 	"local-action/internal/ws"
 )
 
@@ -57,7 +58,7 @@ func TestAPI_ScanSecretsAndRunLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("scan request: %v", err)
 	}
-	var workflows []WorkflowInfo
+	var workflows []workflows.WorkflowInfo
 	json.NewDecoder(resp.Body).Decode(&workflows)
 	resp.Body.Close()
 	if len(workflows) != 1 || workflows[0].Events[0] != "push" {
