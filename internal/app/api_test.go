@@ -14,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	"local-action/internal/db"
+	"local-action/internal/ws"
 )
 
 func newTestRouter(t *testing.T, actStub string) (*http.ServeMux, *sql.DB, string) {
@@ -24,7 +25,7 @@ func newTestRouter(t *testing.T, actStub string) (*http.ServeMux, *sql.DB, strin
 		t.Fatalf("open db: %v", err)
 	}
 	key := make([]byte, keySize)
-	hub := NewHub()
+	hub := ws.NewHub()
 	engine := NewEngine(db, key, actStub, hub.Broadcast, hub.Forget)
 	return NewRouter(db, key, engine, hub, actStub), db, dir
 }

@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"local-action/internal/ws"
 )
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -25,7 +27,7 @@ func readJSON(r *http.Request, v any) error {
 	return json.NewDecoder(r.Body).Decode(v)
 }
 
-func NewRouter(db *sql.DB, key []byte, engine *Engine, hub *Hub, actBin string) *http.ServeMux {
+func NewRouter(db *sql.DB, key []byte, engine *Engine, hub *ws.Hub, actBin string) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
