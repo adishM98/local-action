@@ -8,6 +8,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"local-action/internal/db"
 )
 
 func writeStub(t *testing.T, dir, name, script string) string {
@@ -23,7 +25,7 @@ func TestEngine_SuccessfulRun(t *testing.T) {
 	dir := t.TempDir()
 	stub := writeStub(t, dir, "fake-act-success.sh", "#!/bin/sh\necho \"ran with: $@\"\necho \"line two\" 1>&2\nexit 0\n")
 
-	db, err := OpenDB(filepath.Join(dir, "test.db"))
+	db, err := db.OpenDB(filepath.Join(dir, "test.db"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -75,7 +77,7 @@ done
 exit 0
 `)
 
-	db, err := OpenDB(filepath.Join(dir, "test.db"))
+	db, err := db.OpenDB(filepath.Join(dir, "test.db"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -114,7 +116,7 @@ func TestEngine_OnFinishCalledOnceAfterTerminalStatus(t *testing.T) {
 	dir := t.TempDir()
 	stub := writeStub(t, dir, "fake-act-success.sh", "#!/bin/sh\necho hi\nexit 0\n")
 
-	db, err := OpenDB(filepath.Join(dir, "test.db"))
+	db, err := db.OpenDB(filepath.Join(dir, "test.db"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -153,7 +155,7 @@ func TestEngine_FailingRun(t *testing.T) {
 	dir := t.TempDir()
 	stub := writeStub(t, dir, "fake-act-fail.sh", "#!/bin/sh\necho \"about to fail\"\nexit 1\n")
 
-	db, err := OpenDB(filepath.Join(dir, "test.db"))
+	db, err := db.OpenDB(filepath.Join(dir, "test.db"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -171,7 +173,7 @@ func TestEngine_FailingRun(t *testing.T) {
 func TestEngine_MissingActBinaryLeavesExplanationInLog(t *testing.T) {
 	dir := t.TempDir()
 
-	db, err := OpenDB(filepath.Join(dir, "test.db"))
+	db, err := db.OpenDB(filepath.Join(dir, "test.db"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -201,7 +203,7 @@ func TestEngine_RunsQueueSequentially(t *testing.T) {
 	dir := t.TempDir()
 	stub := writeStub(t, dir, "fake-act-slow.sh", "#!/bin/sh\nsleep 0.3\nexit 0\n")
 
-	db, err := OpenDB(filepath.Join(dir, "test.db"))
+	db, err := db.OpenDB(filepath.Join(dir, "test.db"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -226,7 +228,7 @@ func TestEngine_Cancel(t *testing.T) {
 	dir := t.TempDir()
 	stub := writeStub(t, dir, "fake-act-longsleep.sh", "#!/bin/sh\nsleep 5\nexit 0\n")
 
-	db, err := OpenDB(filepath.Join(dir, "test.db"))
+	db, err := db.OpenDB(filepath.Join(dir, "test.db"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}

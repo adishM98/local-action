@@ -3,10 +3,12 @@ package app
 import (
 	"path/filepath"
 	"testing"
+
+	"local-action/internal/db"
 )
 
 func TestEventPayload_SaveGetRoundTrip(t *testing.T) {
-	db, err := OpenDB(filepath.Join(t.TempDir(), "test.db"))
+	db, err := db.OpenDB(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -53,7 +55,7 @@ func TestEventPayload_SaveGetRoundTrip(t *testing.T) {
 }
 
 func TestEventPayload_SavingEmptyClearsRow(t *testing.T) {
-	db, err := OpenDB(filepath.Join(t.TempDir(), "test.db"))
+	db, err := db.OpenDB(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}

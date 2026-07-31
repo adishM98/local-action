@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"local-action/internal/app"
+	"local-action/internal/db"
 )
 
 func main() {
@@ -24,7 +25,7 @@ func main() {
 		log.Fatalf("load encryption key: %v", err)
 	}
 
-	db, err := app.OpenDB(*dbPath)
+	db, err := db.OpenDB(*dbPath)
 	if err != nil {
 		log.Fatalf("open database: %v", err)
 	}

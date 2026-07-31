@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"path/filepath"
 	"testing"
+
+	"local-action/internal/db"
 )
 
 func TestSecrets_UpsertListGetDelete(t *testing.T) {
-	db, err := OpenDB(filepath.Join(t.TempDir(), "test.db"))
+	db, err := db.OpenDB(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -73,7 +75,7 @@ func TestSecrets_UpsertListGetDelete(t *testing.T) {
 }
 
 func TestListSecrets_EmptyMarshalsAsEmptyArray(t *testing.T) {
-	db, err := OpenDB(filepath.Join(t.TempDir(), "test.db"))
+	db, err := db.OpenDB(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -96,7 +98,7 @@ func TestListSecrets_EmptyMarshalsAsEmptyArray(t *testing.T) {
 }
 
 func TestSecretsForRun_WorkflowOverridesRepoWide(t *testing.T) {
-	db, err := OpenDB(filepath.Join(t.TempDir(), "test.db"))
+	db, err := db.OpenDB(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -128,7 +130,7 @@ func TestSecretsForRun_WorkflowOverridesRepoWide(t *testing.T) {
 }
 
 func TestSecretsForRun_CorruptedValueFails(t *testing.T) {
-	db, err := OpenDB(filepath.Join(t.TempDir(), "test.db"))
+	db, err := db.OpenDB(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}

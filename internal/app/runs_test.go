@@ -5,10 +5,12 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"local-action/internal/db"
 )
 
 func TestRuns_CreateGetUpdateList(t *testing.T) {
-	db, err := OpenDB(filepath.Join(t.TempDir(), "test.db"))
+	db, err := db.OpenDB(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -87,7 +89,7 @@ func TestRuns_CreateGetUpdateList(t *testing.T) {
 // which crashes frontend consumers that call .map() on the response
 // (HistoryPanel.jsx) for a repo with no run history yet.
 func TestListRuns_EmptyMarshalsAsEmptyArray(t *testing.T) {
-	db, err := OpenDB(filepath.Join(t.TempDir(), "test.db"))
+	db, err := db.OpenDB(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -112,7 +114,7 @@ func TestListRuns_EmptyMarshalsAsEmptyArray(t *testing.T) {
 // TestGetRunLogs_EmptyMarshalsAsEmptyArray guards the same nil-slice-to-null
 // pitfall for GetRunLogs, used by the log replay/history views.
 func TestGetRunLogs_EmptyMarshalsAsEmptyArray(t *testing.T) {
-	db, err := OpenDB(filepath.Join(t.TempDir(), "test.db"))
+	db, err := db.OpenDB(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}

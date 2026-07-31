@@ -12,12 +12,14 @@ import (
 	"testing"
 	"time"
 	"unicode/utf8"
+
+	"local-action/internal/db"
 )
 
 func newTestRouter(t *testing.T, actStub string) (*http.ServeMux, *sql.DB, string) {
 	t.Helper()
 	dir := t.TempDir()
-	db, err := OpenDB(filepath.Join(dir, "test.db"))
+	db, err := db.OpenDB(filepath.Join(dir, "test.db"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
