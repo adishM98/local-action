@@ -1,4 +1,4 @@
-package app
+package secrets
 
 import (
 	"bytes"
@@ -13,8 +13,8 @@ func TestLoadOrCreateKey_PersistsAcrossCalls(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first load: %v", err)
 	}
-	if len(key1) != keySize {
-		t.Fatalf("expected key length %d, got %d", keySize, len(key1))
+	if len(key1) != KeySize {
+		t.Fatalf("expected key length %d, got %d", KeySize, len(key1))
 	}
 
 	key2, err := LoadOrCreateKey(path)
@@ -27,7 +27,7 @@ func TestLoadOrCreateKey_PersistsAcrossCalls(t *testing.T) {
 }
 
 func TestEncryptDecrypt_Roundtrip(t *testing.T) {
-	key := make([]byte, keySize)
+	key := make([]byte, KeySize)
 	plaintext := []byte("super-secret-value")
 
 	ciphertext, err := Encrypt(key, plaintext)

@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"local-action/internal/secrets"
 )
 
 type LineHandler func(runID int64, line string)
@@ -208,16 +210,16 @@ func (e *Engine) failEarly(runID int64, started int64, cause error) {
 }
 
 func (e *Engine) writeTempFiles(req RunRequest) (secretFile, varFile, envFile, eventPayloadFile string, cleanup func(), err error) {
-	secrets, err := SecretsForRun(e.db, e.key, req.RepoPath, req.WorkflowFile, KindSecret)
+	secretValues, err := secrets.SecretsForRun(e.db, e.key, req.RepoPath, req.WorkflowFile, secrets.KindSecret)
 	if err != nil {
 		return "", "", "", "", nil, err
 	}
-	vars, err := SecretsForRun(e.db, e.key, req.RepoPath, req.WorkflowFile, KindVar)
+	vars, err := secrets.SecretsForRun(e.db, e.key, req.RepoPath, req.WorkflowFile, secrets.KindVar)
 	if err != nil {
 		return "", "", "", "", nil, err
 	}
 
-	sf, err := writeDotenvTemp("act-secrets-*.env", secrets, req.ExtraSecrets)
+	sf, err := writeDotenvTemp("act-secrets-*.env", secretValues, req.ExtraSecrets)
 	if err != nil {
 		return "", "", "", "", nil, err
 	}

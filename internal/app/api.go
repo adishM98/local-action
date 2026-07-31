@@ -14,6 +14,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"local-action/internal/secrets"
 	"local-action/internal/ws"
 )
 
@@ -77,8 +78,8 @@ func NewRouter(db *sql.DB, key []byte, engine *Engine, hub *ws.Hub, actBin strin
 
 	mux.HandleFunc("GET /api/secrets", func(w http.ResponseWriter, r *http.Request) {
 		repoPath := r.URL.Query().Get("repoPath")
-		kind := SecretKind(r.URL.Query().Get("kind"))
-		entries, err := ListSecrets(db, repoPath, kind)
+		kind := secrets.SecretKind(r.URL.Query().Get("kind"))
+		entries, err := secrets.ListSecrets(db, repoPath, kind)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -88,17 +89,17 @@ func NewRouter(db *sql.DB, key []byte, engine *Engine, hub *ws.Hub, actBin strin
 
 	mux.HandleFunc("POST /api/secrets", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
-			RepoPath     string     `json:"repoPath"`
-			Kind         SecretKind `json:"kind"`
-			Key          string     `json:"key"`
-			Value        string     `json:"value"`
-			WorkflowFile string     `json:"workflowFile"`
+			RepoPath     string            `json:"repoPath"`
+			Kind         secrets.SecretKind `json:"kind"`
+			Key          string            `json:"key"`
+			Value        string            `json:"value"`
+			WorkflowFile string            `json:"workflowFile"`
 		}
 		if err := readJSON(r, &body); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if err := UpsertSecret(db, key, body.RepoPath, body.Kind, body.Key, body.Value, body.WorkflowFile); err != nil {
+		if err := secrets.UpsertSecret(db, key, body.RepoPath, body.Kind, body.Key, body.Value, body.WorkflowFile); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -107,16 +108,16 @@ func NewRouter(db *sql.DB, key []byte, engine *Engine, hub *ws.Hub, actBin strin
 
 	mux.HandleFunc("DELETE /api/secrets", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
-			RepoPath     string     `json:"repoPath"`
-			Kind         SecretKind `json:"kind"`
-			Key          string     `json:"key"`
-			WorkflowFile string     `json:"workflowFile"`
+			RepoPath     string            `json:"repoPath"`
+			Kind         secrets.SecretKind `json:"kind"`
+			Key          string            `json:"key"`
+			WorkflowFile string            `json:"workflowFile"`
 		}
 		if err := readJSON(r, &body); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if err := DeleteSecret(db, body.RepoPath, body.Kind, body.Key, body.WorkflowFile); err != nil {
+		if err := secrets.DeleteSecret(db, body.RepoPath, body.Kind, body.Key, body.WorkflowFile); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}

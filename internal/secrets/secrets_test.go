@@ -1,4 +1,4 @@
-package app
+package secrets
 
 import (
 	"encoding/json"
@@ -15,7 +15,7 @@ func TestSecrets_UpsertListGetDelete(t *testing.T) {
 	}
 	defer db.Close()
 
-	key := make([]byte, keySize)
+	key := make([]byte, KeySize)
 
 	if err := UpsertSecret(db, key, "/repo/a", KindSecret, "TOKEN", "abc123", ""); err != nil {
 		t.Fatalf("upsert: %v", err)
@@ -103,7 +103,7 @@ func TestSecretsForRun_WorkflowOverridesRepoWide(t *testing.T) {
 		t.Fatalf("open db: %v", err)
 	}
 	defer db.Close()
-	key := make([]byte, keySize)
+	key := make([]byte, KeySize)
 	const wf = ".github/workflows/ci.yml"
 
 	// repo-wide FOO and BAR, workflow-specific FOO for ci.yml,
@@ -135,7 +135,7 @@ func TestSecretsForRun_CorruptedValueFails(t *testing.T) {
 		t.Fatalf("open db: %v", err)
 	}
 	defer db.Close()
-	key := make([]byte, keySize)
+	key := make([]byte, KeySize)
 
 	if _, err := db.Exec(
 		`INSERT INTO secrets (repo_path, kind, key, workflow_file, value_encrypted) VALUES (?, ?, ?, '', ?)`,

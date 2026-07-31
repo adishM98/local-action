@@ -14,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	"local-action/internal/db"
+	"local-action/internal/secrets"
 	"local-action/internal/ws"
 )
 
@@ -24,7 +25,7 @@ func newTestRouter(t *testing.T, actStub string) (*http.ServeMux, *sql.DB, strin
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	key := make([]byte, keySize)
+	key := make([]byte, secrets.KeySize)
 	hub := ws.NewHub()
 	engine := NewEngine(db, key, actStub, hub.Broadcast, hub.Forget)
 	return NewRouter(db, key, engine, hub, actStub), db, dir
@@ -74,7 +75,7 @@ func TestAPI_ScanSecretsAndRunLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list secrets: %v", err)
 	}
-	var entries []SecretEntry
+	var entries []secrets.SecretEntry
 	json.NewDecoder(resp.Body).Decode(&entries)
 	resp.Body.Close()
 	if len(entries) != 1 || entries[0].Key != "TOKEN" {
@@ -169,7 +170,7 @@ func TestAPI_WorkflowScopedSecrets(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
-	var entries []SecretEntry
+	var entries []secrets.SecretEntry
 	json.NewDecoder(resp.Body).Decode(&entries)
 	resp.Body.Close()
 	if len(entries) != 2 {

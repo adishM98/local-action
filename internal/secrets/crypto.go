@@ -1,4 +1,4 @@
-package app
+package secrets
 
 import (
 	"crypto/aes"
@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 )
 
-const keySize = 32 // AES-256
+const KeySize = 32 // AES-256
 
 func DefaultKeyPath() (string, error) {
 	dir, err := os.UserConfigDir()
@@ -25,7 +25,7 @@ func LoadOrCreateKey(path string) ([]byte, error) {
 	data, err := os.ReadFile(path)
 	if err == nil {
 		key, decErr := base64.StdEncoding.DecodeString(string(data))
-		if decErr != nil || len(key) != keySize {
+		if decErr != nil || len(key) != KeySize {
 			return nil, errors.New("seed key file is corrupt")
 		}
 		return key, nil
@@ -34,7 +34,7 @@ func LoadOrCreateKey(path string) ([]byte, error) {
 		return nil, err
 	}
 
-	key := make([]byte, keySize)
+	key := make([]byte, KeySize)
 	if _, err := rand.Read(key); err != nil {
 		return nil, err
 	}

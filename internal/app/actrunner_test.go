@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"local-action/internal/db"
+	"local-action/internal/secrets"
 )
 
 func writeStub(t *testing.T, dir, name, script string) string {
@@ -33,7 +34,7 @@ func TestEngine_SuccessfulRun(t *testing.T) {
 
 	var mu sync.Mutex
 	var lines []string
-	engine := NewEngine(db, make([]byte, keySize), stub, func(runID int64, line string) {
+	engine := NewEngine(db, make([]byte, secrets.KeySize), stub, func(runID int64, line string) {
 		mu.Lock()
 		defer mu.Unlock()
 		lines = append(lines, line)
@@ -85,7 +86,7 @@ exit 0
 
 	var mu sync.Mutex
 	var lines []string
-	engine := NewEngine(db, make([]byte, keySize), stub, func(runID int64, line string) {
+	engine := NewEngine(db, make([]byte, secrets.KeySize), stub, func(runID int64, line string) {
 		mu.Lock()
 		defer mu.Unlock()
 		lines = append(lines, line)
@@ -125,7 +126,7 @@ func TestEngine_OnFinishCalledOnceAfterTerminalStatus(t *testing.T) {
 	var mu sync.Mutex
 	var finishedIDs []int64
 	var statusAtFinish RunStatus
-	engine := NewEngine(db, make([]byte, keySize), stub, nil, func(runID int64) {
+	engine := NewEngine(db, make([]byte, secrets.KeySize), stub, nil, func(runID int64) {
 		mu.Lock()
 		defer mu.Unlock()
 		finishedIDs = append(finishedIDs, runID)
@@ -161,7 +162,7 @@ func TestEngine_FailingRun(t *testing.T) {
 	}
 	defer db.Close()
 
-	engine := NewEngine(db, make([]byte, keySize), stub, nil, nil)
+	engine := NewEngine(db, make([]byte, secrets.KeySize), stub, nil, nil)
 	runID, err := engine.Enqueue(RunRequest{RepoPath: dir, WorkflowFile: "wf.yml", Event: "push"})
 	if err != nil {
 		t.Fatalf("enqueue: %v", err)
@@ -179,7 +180,7 @@ func TestEngine_MissingActBinaryLeavesExplanationInLog(t *testing.T) {
 	}
 	defer db.Close()
 
-	engine := NewEngine(db, make([]byte, keySize), filepath.Join(dir, "no-such-act-binary"), nil, nil)
+	engine := NewEngine(db, make([]byte, secrets.KeySize), filepath.Join(dir, "no-such-act-binary"), nil, nil)
 	runID, err := engine.Enqueue(RunRequest{RepoPath: dir, WorkflowFile: "wf.yml", Event: "push"})
 	if err != nil {
 		t.Fatalf("enqueue: %v", err)
@@ -209,7 +210,7 @@ func TestEngine_RunsQueueSequentially(t *testing.T) {
 	}
 	defer db.Close()
 
-	engine := NewEngine(db, make([]byte, keySize), stub, nil, nil)
+	engine := NewEngine(db, make([]byte, secrets.KeySize), stub, nil, nil)
 
 	id1, _ := engine.Enqueue(RunRequest{RepoPath: dir, WorkflowFile: "wf.yml", Event: "push"})
 	id2, _ := engine.Enqueue(RunRequest{RepoPath: dir, WorkflowFile: "wf.yml", Event: "push"})
@@ -234,7 +235,7 @@ func TestEngine_Cancel(t *testing.T) {
 	}
 	defer db.Close()
 
-	engine := NewEngine(db, make([]byte, keySize), stub, nil, nil)
+	engine := NewEngine(db, make([]byte, secrets.KeySize), stub, nil, nil)
 	runID, _ := engine.Enqueue(RunRequest{RepoPath: dir, WorkflowFile: "wf.yml", Event: "push"})
 
 	waitForStatus(t, db, runID, StatusRunning)

@@ -8,6 +8,7 @@ import (
 
 	"local-action/internal/app"
 	"local-action/internal/db"
+	"local-action/internal/secrets"
 	"local-action/internal/ws"
 )
 
@@ -17,11 +18,11 @@ func main() {
 	actBin := flag.String("act-bin", "act", "path to act executable")
 	flag.Parse()
 
-	keyPath, err := app.DefaultKeyPath()
+	keyPath, err := secrets.DefaultKeyPath()
 	if err != nil {
 		log.Fatalf("resolve key path: %v", err)
 	}
-	key, err := app.LoadOrCreateKey(keyPath)
+	key, err := secrets.LoadOrCreateKey(keyPath)
 	if err != nil {
 		log.Fatalf("load encryption key: %v", err)
 	}
