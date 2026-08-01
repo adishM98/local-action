@@ -1,27 +1,25 @@
 # Architecture
 
 ```
-Browser (React SPA, cmd/local-action/web/src)
+Browser (React SPA, web/src)
    |  HTTP (REST) + WebSocket
    v
 cmd/local-action (package main)
    |-- main.go          flags, wiring, embedded static file serving
-   |-- embed.go         go:embed of web/dist (built frontend)
    |
    v  imports
-internal/app (package app)
-   |-- scanner.go       parse .github/workflows/*.yml (on: string/list/map, workflow_dispatch inputs)
-   |-- secrets.go       encrypted secrets/vars CRUD (SQLite, AES-256-GCM via crypto.go)
-   |-- runs.go          run history + log line storage (SQLite)
-   |-- actrunner*.go    builds act argv, runs it via FIFO single-worker queue
-   |-- ws.go            WebSocket hub: per-run buffered replay + live broadcast
-   |-- api.go           HTTP routes wiring all of the above
+internal/db          OpenDB, schema, migrations
+internal/secrets     encrypted secrets/vars CRUD, AES-256-GCM
+internal/workflows   .github/workflows/*.yml parsing, category overrides, saved event payloads
+internal/runs        run history/log storage, the act-invoking Engine (FIFO single-worker queue)
+internal/ws          WebSocket hub: per-run buffered replay + live broadcast
+internal/httpapi     HTTP routes wiring all of the above
    |
    v
 act CLI  -->  Docker (host)
 ```
 
-All backend logic lives in `internal/app` as one package (not split further — these files are small and interdependent enough that separate sub-packages would just add import ceremony). `cmd/local-action` is the thin entrypoint: flag parsing, wiring `internal/app`'s constructors together, and serving the embedded frontend. The frontend lives under `cmd/local-action/web/` rather than at the repo root because `go:embed` patterns can't reference paths outside the directory tree of the file that declares them.
+Backend logic is split into domain packages under `internal/` (`db`, `secrets`, `workflows`, `runs`, `ws`, `httpapi`) instead of one flat package — each has one clear responsibility, and `httpapi` is pure wiring with no logic of its own. `cmd/local-action` is the thin entrypoint: flag parsing, wiring the packages' constructors together, and serving the embedded frontend. The frontend lives at top-level `web/` (see "Building the frontend" in the README for why `go:embed` needs its own file there).
 
 ## Request flow: triggering a run
 
@@ -40,7 +38,7 @@ All backend logic lives in `internal/app` as one package (not split further — 
 ## Concurrency invariants
 
 - **One `act` process at a time.** Enforced structurally: a single buffered channel drained by a single worker goroutine (`Engine.worker`). No locking needed for exclusion — there's simply one consumer.
-- **`db.SetMaxOpenConns(1)` + `PRAGMA busy_timeout=5000`** (db.go). `modernc.org/sqlite` has no built-in wait-on-lock behavior across multiple pooled connections; the concurrent writers this app has (log-streaming goroutines, status updates, HTTP reads) would otherwise intermittently hit `SQLITE_BUSY`. Forcing everything through one connection with a busy timeout serializes access safely. Fine for this app's scale (single local user).
+- **`db.SetMaxOpenConns(1)` + `PRAGMA busy_timeout=5000`** (`internal/db/db.go`). `modernc.org/sqlite` has no built-in wait-on-lock behavior across multiple pooled connections; the concurrent writers this app has (log-streaming goroutines, status updates, HTTP reads) would otherwise intermittently hit `SQLITE_BUSY`. Forcing everything through one connection with a busy timeout serializes access safely. Fine for this app's scale (single local user).
 - **`e.running` map** (actrunner.go) is guarded by a mutex on every access (registration, `Cancel`, deletion). The process is registered in the map *before* the DB status flips to `running`, so a client that observes "running" via polling can never race ahead of `Cancel()`'s ability to find and kill the process.
 - **WebSocket hub buffer/registration** happen under one lock in `ServeWS`, so a line broadcast concurrently with a new client connecting can't be dropped or double-delivered.
 
@@ -60,4 +58,4 @@ Encryption key: 32 random bytes, generated once, stored at `$XDG_CONFIG_HOME/loc
 - Local filesystem repo paths only — no git clone/remote/auth handling.
 - Whole-workflow runs only — no per-job selection.
 - One run at a time — no concurrency.
-- `scanner.go`'s `ScanWorkflows` returns `nil` (not `[]`) when a repo has no workflow files; the frontend defends against this (`result || []`) but it's an inconsistency with the rest of the API's empty-list handling, worth normalizing if it ever bites.
+- `internal/workflows/scanner.go`'s `ScanWorkflows` returns `nil` (not `[]`) when a repo has no workflow files; the frontend defends against this (`result || []`) but it's an inconsistency with the rest of the API's empty-list handling, worth normalizing if it ever bites.
