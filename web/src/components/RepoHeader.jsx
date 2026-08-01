@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { Container, Terminal, Sun, Moon, Monitor, Check } from 'lucide-react'
+import { Container, Sun, Moon, Monitor, Check } from 'lucide-react'
 
 const THEME_KEY = 'theme'
 
@@ -60,7 +60,7 @@ function HealthItem({ icon: Icon, label, ok, error, onClick }) {
   return (
     <button className={`health__item health__item--${state}`} title={title} onClick={onClick}>
       <span className={`dot dot--${state}`} />
-      <Icon size={13} />
+      {Icon && <Icon size={13} />}
       {label}
     </button>
   )
@@ -89,7 +89,7 @@ export default function RepoHeader({ health, onRecheck, onNavigate }) {
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
             <button className="health__item" title={`Theme: ${mode}`}>
-              <ThemeIcon size={13} />
+              <ThemeIcon size={18} />
             </button>
           </DropdownMenu.Trigger>
           <DropdownMenu.Portal>
@@ -107,7 +107,6 @@ export default function RepoHeader({ health, onRecheck, onNavigate }) {
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
         <HealthItem icon={Container} label="Docker" ok={health?.dockerOK} error={health?.dockerError} onClick={onRecheck} />
-        <HealthItem icon={Terminal} label="Act" ok={health?.actOK} onClick={onRecheck} />
       </div>
     </header>
   )
