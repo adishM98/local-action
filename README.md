@@ -111,4 +111,8 @@ make lint   # gofmt -l . && go vet ./... (check only)
 make fmt    # gofmt -w . (formats in place)
 ```
 
-See `docs/ARCHITECTURE.md` for how the pieces fit together, and `docs/superpowers/` for the original design spec and implementation plan.
+See `docs/ARCHITECTURE.md` for how the pieces fit together, and `docs/superpowers/` for the original design spec and implementation plan. See [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) for a full walkthrough of every screen and feature. Contributions welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+[MIT](LICENSE)

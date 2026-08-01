@@ -103,10 +103,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   cursor: pointer;
   text-align: left;
 }
-/* Nudged up 2px — Inter's glyphs sit slightly high inside their own
-   line-box, so a geometrically-centered icon reads as sitting a hair low
-   next to geometrically-centered text unless corrected. */
-.repo-header__brand-logo { width: 48px; height: 48px; border-radius: 7px; flex-shrink: 0; position: relative; top: -2px; }
+.repo-header__brand-logo { width: 48px; height: 48px; border-radius: 7px; flex-shrink: 0; }
 .repo-header__brand-text { display: flex; flex-direction: column; justify-content: center; min-width: 0; }
 .repo-header__brand-name {
   display: block;
@@ -115,6 +112,11 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   font-size: 24px;
   letter-spacing: -0.01em;
   color: var(--text);
+  /* Measured against the 48px logo (headless screenshot + pixel-bounds
+     analysis): Inter's glyph ink sits ~1.5px below the logo's visual
+     center at this size, not above — nudge up to match. */
+  position: relative;
+  top: -1.5px;
 }
 .repo-header__brand-accent {
   background: linear-gradient(90deg, #6d8dfb, #8b5cf6);
