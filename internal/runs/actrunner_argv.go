@@ -32,11 +32,25 @@ type RunRequest struct {
 // architecture otherwise — on Apple Silicon that's arm64, which silently
 // diverges from real CI (some native npm packages refuse to build on
 // arm64 even though they work fine on GitHub's actual x64 runners).
+//
+// AGENT_TOOLSDIRECTORY is always overridden to a scratch path. act's
+// runner image sets this to /opt/hostedtoolcache to emulate GitHub-hosted
+// runners, but unlike a real hosted runner that path is an active mount
+// point in act's container — busy, not just populated. A very common
+// "free disk space" CI step does `rm -rf "$AGENT_TOOLSDIRECTORY"` (with no
+// `|| true`, unlike the apt-get cleanup lines usually right above it in
+// the same script), and `rm -rf` on a busy mount fails even with -f,
+// taking the whole step down under act even though the exact same script
+// runs fine on a real runner. Pointing the variable at a path that simply
+// doesn't exist in the container makes that rm a silent no-op — verified
+// against a real act invocation, not inferred. This never touches the
+// scanned repo's workflow files.
 func BuildArgv(req RunRequest, secretFile, varFile, envFile, eventPayloadFile string) []string {
 	argv := []string{
 		req.Event, "-W", req.WorkflowFile, "--json",
 		"--secret-file", secretFile, "--var-file", varFile, "--env-file", envFile,
 		"--container-architecture", "linux/amd64",
+		"--env", "AGENT_TOOLSDIRECTORY=/tmp/local-action-agent-tools",
 	}
 	if eventPayloadFile != "" {
 		argv = append(argv, "-e", eventPayloadFile)
