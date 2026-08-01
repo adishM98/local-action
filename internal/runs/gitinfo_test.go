@@ -1,4 +1,4 @@
-package app
+package runs
 
 import (
 	"os/exec"

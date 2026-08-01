@@ -14,6 +14,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"local-action/internal/runs"
 	"local-action/internal/secrets"
 	"local-action/internal/workflows"
 	"local-action/internal/ws"
@@ -29,7 +30,7 @@ func readJSON(r *http.Request, v any) error {
 	return json.NewDecoder(r.Body).Decode(v)
 }
 
-func NewRouter(db *sql.DB, key []byte, engine *Engine, hub *ws.Hub, actBin string) *http.ServeMux {
+func NewRouter(db *sql.DB, key []byte, engine *runs.Engine, hub *ws.Hub, actBin string) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
@@ -143,7 +144,7 @@ func NewRouter(db *sql.DB, key []byte, engine *Engine, hub *ws.Hub, actBin strin
 			http.Error(w, "eventPayload is not valid JSON", http.StatusBadRequest)
 			return
 		}
-		runID, err := engine.Enqueue(RunRequest{
+		runID, err := engine.Enqueue(runs.RunRequest{
 			RepoPath:     body.RepoPath,
 			WorkflowFile: body.WorkflowFile,
 			Event:        body.Event,
@@ -220,12 +221,12 @@ func NewRouter(db *sql.DB, key []byte, engine *Engine, hub *ws.Hub, actBin strin
 
 	mux.HandleFunc("GET /api/runs", func(w http.ResponseWriter, r *http.Request) {
 		repoPath := r.URL.Query().Get("repoPath")
-		runs, err := ListRuns(db, repoPath)
+		runList, err := runs.ListRuns(db, repoPath)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		writeJSON(w, http.StatusOK, runs)
+		writeJSON(w, http.StatusOK, runList)
 	})
 
 	mux.HandleFunc("GET /api/runs/{id}", func(w http.ResponseWriter, r *http.Request) {
@@ -234,7 +235,7 @@ func NewRouter(db *sql.DB, key []byte, engine *Engine, hub *ws.Hub, actBin strin
 			http.Error(w, "invalid run id", http.StatusBadRequest)
 			return
 		}
-		run, err := GetRun(db, id)
+		run, err := runs.GetRun(db, id)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				http.Error(w, "run not found", http.StatusNotFound)
@@ -243,7 +244,7 @@ func NewRouter(db *sql.DB, key []byte, engine *Engine, hub *ws.Hub, actBin strin
 			}
 			return
 		}
-		logs, err := GetRunLogs(db, id)
+		logs, err := runs.GetRunLogs(db, id)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

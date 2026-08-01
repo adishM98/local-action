@@ -8,6 +8,7 @@ import (
 
 	"local-action/internal/app"
 	"local-action/internal/db"
+	"local-action/internal/runs"
 	"local-action/internal/secrets"
 	"local-action/internal/ws"
 )
@@ -34,7 +35,7 @@ func main() {
 	defer db.Close()
 
 	hub := ws.NewHub()
-	engine := app.NewEngine(db, key, *actBin, hub.Broadcast, hub.Forget)
+	engine := runs.NewEngine(db, key, *actBin, hub.Broadcast, hub.Forget)
 
 	mux := app.NewRouter(db, key, engine, hub, *actBin)
 

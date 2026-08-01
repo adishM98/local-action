@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -14,6 +15,7 @@ import (
 	"unicode/utf8"
 
 	"local-action/internal/db"
+	"local-action/internal/runs"
 	"local-action/internal/secrets"
 	"local-action/internal/workflows"
 	"local-action/internal/ws"
@@ -28,7 +30,7 @@ func newTestRouter(t *testing.T, actStub string) (*http.ServeMux, *sql.DB, strin
 	}
 	key := make([]byte, secrets.KeySize)
 	hub := ws.NewHub()
-	engine := NewEngine(db, key, actStub, hub.Broadcast, hub.Forget)
+	engine := runs.NewEngine(db, key, actStub, hub.Broadcast, hub.Forget)
 	return NewRouter(db, key, engine, hub, actStub), db, dir
 }
 
@@ -354,8 +356,8 @@ func TestAPI_CreateRun_ReachesActWithEventPayload(t *testing.T) {
 	json.NewDecoder(resp.Body).Decode(&created)
 	resp.Body.Close()
 
-	waitForStatus(t, db, created.RunID, StatusSuccess)
-	logs, err := GetRunLogs(db, created.RunID)
+	waitForStatus(t, db, created.RunID, runs.StatusSuccess)
+	logs, err := runs.GetRunLogs(db, created.RunID)
 	if err != nil {
 		t.Fatalf("get logs: %v", err)
 	}
@@ -431,8 +433,8 @@ func TestAPI_CreateRun_CapturesBranchAndCommitFromRealGitRepo(t *testing.T) {
 	json.NewDecoder(resp.Body).Decode(&created)
 	resp.Body.Close()
 
-	waitForStatus(t, db, created.RunID, StatusSuccess)
-	run, err := GetRun(db, created.RunID)
+	waitForStatus(t, db, created.RunID, runs.StatusSuccess)
+	run, err := runs.GetRun(db, created.RunID)
 	if err != nil {
 		t.Fatalf("get run: %v", err)
 	}
@@ -458,5 +460,31 @@ func TestTruncateTail(t *testing.T) {
 	got = truncateTail(multi, 301)    // 301 would split a rune without the boundary scan
 	if !utf8.ValidString(got) {
 		t.Fatal("truncateTail produced invalid UTF-8")
+	}
+}
+
+func waitForStatus(t *testing.T, db *sql.DB, runID int64, want runs.RunStatus) {
+	t.Helper()
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		run, err := runs.GetRun(db, runID)
+		if err != nil {
+			t.Fatalf("get run: %v", err)
+		}
+		if run.Status == want {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("run %d did not reach status %q within timeout", runID, want)
+}
+
+func runGit(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	cmd.Env = append(cmd.Env, "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t.com", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t.com")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
 	}
 }
