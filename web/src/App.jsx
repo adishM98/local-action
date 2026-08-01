@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from './api.js'
-import TopBar from './components/TopBar.jsx'
+import RepoHeader from './components/RepoHeader.jsx'
 import Sidebar from './components/Sidebar.jsx'
+import Overview from './components/Overview.jsx'
 import RunsView from './components/RunsView.jsx'
 import RunDetail from './components/RunDetail.jsx'
 import SecretsPage from './components/SecretsPage.jsx'
@@ -11,11 +12,12 @@ export default function App() {
   const [repoPath, setRepoPath] = useState(localStorage.getItem('repoPath') || '')
   const [workflows, setWorkflows] = useState([])
   const [scanState, setScanState] = useState({ scanned: false, error: null })
-  const [view, setView] = useState({ name: 'runs', workflowFile: null })
+  const [view, setView] = useState({ name: 'overview' })
   const [health, setHealth] = useState(null)
   const [drawerRunId, setDrawerRunId] = useState(null)
   const [runs, setRuns] = useState([])
   const [runsError, setRunsError] = useState(null)
+  const [branch, setBranch] = useState(null)
 
   const checkHealth = useCallback(async () => {
     try {
@@ -55,6 +57,26 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // initial scan for the remembered path only; later scans go through commitRepoPath
 
+  // Repo header's branch line — refetched whenever the repo path changes.
+  useEffect(() => {
+    if (!repoPath) {
+      setBranch(null)
+      return
+    }
+    let cancelled = false
+    api
+      .repoInfo(repoPath)
+      .then((result) => {
+        if (!cancelled) setBranch(result?.branch || null)
+      })
+      .catch(() => {
+        if (!cancelled) setBranch(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [repoPath])
+
   // Polled here (not inside RunsView) so the sidebar's per-workflow
   // last-run-status icons share the same fetch instead of duplicating it.
   useEffect(() => {
@@ -82,16 +104,32 @@ export default function App() {
   function commitRepoPath(path) {
     setRepoPath(path)
     localStorage.setItem('repoPath', path)
-    setView({ name: 'runs', workflowFile: null })
+    setView({ name: 'overview' })
     scan(path)
   }
 
   return (
     <div className="app">
-      <TopBar repoPath={repoPath} onCommit={commitRepoPath} health={health} onRecheck={checkHealth} />
+      <RepoHeader repoPath={repoPath} onCommit={commitRepoPath} health={health} onRecheck={checkHealth} branch={branch} />
       <div className="shell">
-        <Sidebar workflows={workflows} scanState={scanState} view={view} onNavigate={setView} runs={runs} />
+        <Sidebar
+          repoPath={repoPath}
+          workflows={workflows}
+          scanState={scanState}
+          view={view}
+          onNavigate={setView}
+          runs={runs}
+        />
         <main className="content">
+          {view.name === 'overview' && (
+            <Overview
+              repoPath={repoPath}
+              workflows={workflows}
+              runs={runs}
+              onOpenRun={setDrawerRunId}
+              onNavigate={setView}
+            />
+          )}
           {view.name === 'runs' && (
             <RunsView
               repoPath={repoPath}

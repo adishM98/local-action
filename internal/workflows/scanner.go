@@ -21,8 +21,21 @@ type WorkflowInfo struct {
 	UsedSecrets      []string        `json:"usedSecrets,omitempty"`
 	UsedVars         []string        `json:"usedVars,omitempty"`
 	AutoEventPayload string          `json:"autoEventPayload,omitempty"`
-	AutoCategory     string          `json:"autoCategory"`
-	ParseError       string          `json:"parseError,omitempty"`
+	// NeedsEventPayload is true when some job's if: condition references
+	// github.event.* but couldn't be auto-solved into AutoEventPayload —
+	// the frontend uses this to show a manual event-payload field only
+	// when one is actually load-bearing, not for every workflow whose
+	// condition (if any) simply doesn't depend on event data.
+	NeedsEventPayload bool `json:"needsEventPayload,omitempty"`
+	// SuggestedEventPayload is a best-effort guess for the manual field's
+	// starting value, set only when NeedsEventPayload is true and
+	// AutoEventPayload couldn't be fully solved. Unlike AutoEventPayload
+	// it's not guaranteed correct — it merges whatever recognizable
+	// clauses it found regardless of &&/||, so the user still needs to
+	// check it.
+	SuggestedEventPayload string `json:"suggestedEventPayload,omitempty"`
+	AutoCategory          string `json:"autoCategory"`
+	ParseError            string `json:"parseError,omitempty"`
 }
 
 // categoryKeywords is checked in order — more specific categories (Security)
@@ -174,7 +187,7 @@ func ParseWorkflowFile(path string) (WorkflowInfo, error) {
 	info.AutoCategory = autoCategoryFor(info.Name, filepath.Base(path))
 
 	if jobsNode != nil {
-		info.AutoEventPayload = autoEventPayloadFromJobs(jobsNode)
+		info.AutoEventPayload, info.SuggestedEventPayload, info.NeedsEventPayload = autoEventPayloadFromJobs(jobsNode)
 	}
 
 	if onNode == nil {
@@ -218,18 +231,30 @@ func parseOnNode(n *yaml.Node) ([]string, []DispatchInput, error) {
 	return events, dispatchInputs, nil
 }
 
-var ifClauseRe = regexp.MustCompile(`^github\.event\.([A-Za-z0-9_.]+)\s*==\s*(?:'([^']*)'|"([^"]*)")$`)
+var (
+	// Plain equality: github.event.<path> == 'value'.
+	ifClauseRe = regexp.MustCompile(`github\.event\.([A-Za-z0-9_.]+)\s*==\s*(?:'([^']*)'|"([^"]*)")`)
+	// The common "does this PR have label X" idiom: GitHub's `.*.` glob
+	// selects a field across every element of an array and flattens it
+	// into a list, which contains() then searches — e.g.
+	// contains(github.event.pull_request.labels.*.name, 'run-ci').
+	containsLabelRe = regexp.MustCompile(`contains\(\s*github\.event\.([A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*)\.\*\.([A-Za-z0-9_]+)\s*,\s*(?:'([^']*)'|"([^"]*)")\s*\)`)
+	githubEventRe   = regexp.MustCompile(`github\.event\.`)
+)
 
 // autoEventPayloadFromJobs scans each job's if: condition for the first one
-// that reduces to a plain conjunction of github.event.<path> == '<value>'
-// clauses, and returns the matching JSON payload (act's -e/--eventpath
-// shape) so the condition evaluates true without the user hand-writing it.
-// Conditions using ||, negation, function calls, or comparisons against
-// anything other than github.event.* are left alone — job.if is simply not
-// auto-solvable, and the user can still supply a payload manually.
-func autoEventPayloadFromJobs(jobsNode *yaml.Node) string {
+// that fully solves (see solveIfCondition), and returns its JSON payload
+// (act's -e/--eventpath shape) so the condition evaluates true without the
+// user hand-writing it. If nothing fully solves but some condition still
+// references github.event.*, suggested is a best-effort guess built from
+// whichever individual clauses ARE recognizable — a starting point for
+// manual entry, not a guarantee, since it ignores how clauses combine
+// (&&/||) and merges every match it finds. needsPayload is true whenever a
+// condition references github.event.* at all, solved or not — that's what
+// tells the frontend a payload is actually load-bearing for this workflow.
+func autoEventPayloadFromJobs(jobsNode *yaml.Node) (payload, suggested string, needsPayload bool) {
 	if jobsNode.Kind != yaml.MappingNode {
-		return ""
+		return "", "", false
 	}
 	for i := 0; i < len(jobsNode.Content); i += 2 {
 		jobNode := jobsNode.Content[i+1]
@@ -244,14 +269,28 @@ func autoEventPayloadFromJobs(jobsNode *yaml.Node) string {
 			if ifValue.Kind != yaml.ScalarNode {
 				continue
 			}
-			if payload, ok := solveIfCondition(ifValue.Value); ok {
-				return payload
+			if !githubEventRe.MatchString(ifValue.Value) {
+				continue
+			}
+			if solved, ok := solveIfCondition(ifValue.Value); ok {
+				return solved, "", true
+			}
+			needsPayload = true
+			if suggested == "" {
+				suggested = suggestEventPayload(ifValue.Value)
 			}
 		}
 	}
-	return ""
+	return "", suggested, needsPayload
 }
 
+// solveIfCondition fully solves cond only when it's a plain conjunction
+// (&&-joined, no ||, no negation) of clauses this package recognizes:
+// github.event.<path> == 'value', or contains(github.event.<path>.*.<leaf>,
+// 'value'). Anything else — a single unrecognized clause, or any use of ||
+// or ! anywhere in cond — fails the whole condition, since a partial solve
+// of a conjunction could silently produce a payload that makes the
+// condition evaluate true when the real event wouldn't.
 func solveIfCondition(cond string) (string, bool) {
 	cond = strings.TrimSpace(cond)
 	cond = strings.TrimPrefix(cond, "${{")
@@ -263,15 +302,10 @@ func solveIfCondition(cond string) (string, bool) {
 
 	root := map[string]any{}
 	for _, clause := range strings.Split(cond, "&&") {
-		m := ifClauseRe.FindStringSubmatch(strings.TrimSpace(clause))
-		if m == nil {
+		clause = strings.TrimSpace(clause)
+		if !applyClause(root, clause, true) {
 			return "", false
 		}
-		value := m[2]
-		if value == "" && m[3] != "" {
-			value = m[3]
-		}
-		setNestedPath(root, strings.Split(m[1], "."), value)
 	}
 
 	b, err := json.Marshal(root)
@@ -279,6 +313,70 @@ func solveIfCondition(cond string) (string, bool) {
 		return "", false
 	}
 	return string(b), true
+}
+
+// suggestEventPayload scans cond for every recognizable clause regardless
+// of how they're joined (&&, ||, or anything else) and merges them into
+// one best-effort payload. Unlike solveIfCondition this never fails outright
+// — it returns "" only when nothing recognizable was found at all.
+func suggestEventPayload(cond string) string {
+	cond = strings.TrimSpace(cond)
+	cond = strings.TrimPrefix(cond, "${{")
+	cond = strings.TrimSuffix(cond, "}}")
+	cond = strings.TrimSpace(cond)
+
+	root := map[string]any{}
+	found := false
+	for _, m := range ifClauseRe.FindAllStringSubmatch(cond, -1) {
+		value := m[2]
+		if value == "" && m[3] != "" {
+			value = m[3]
+		}
+		setNestedPath(root, strings.Split(m[1], "."), value)
+		found = true
+	}
+	for _, m := range containsLabelRe.FindAllStringSubmatch(cond, -1) {
+		value := m[3]
+		if value == "" && m[4] != "" {
+			value = m[4]
+		}
+		setNestedArrayLeaf(root, m[1], m[2], value)
+		found = true
+	}
+	if !found {
+		return ""
+	}
+	b, err := json.Marshal(root)
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
+
+// applyClause matches a single clause against every recognized pattern and
+// applies the first match to root. anchored requires the clause to consist
+// of nothing but the matched pattern (used by solveIfCondition, where a
+// clause with trailing junk isn't actually fully understood); the
+// permissive scan in suggestEventPayload doesn't call this at all since it
+// wants every match anywhere, anchored or not.
+func applyClause(root map[string]any, clause string, anchored bool) bool {
+	if m := ifClauseRe.FindStringSubmatch(clause); m != nil && (!anchored || m[0] == clause) {
+		value := m[2]
+		if value == "" && m[3] != "" {
+			value = m[3]
+		}
+		setNestedPath(root, strings.Split(m[1], "."), value)
+		return true
+	}
+	if m := containsLabelRe.FindStringSubmatch(clause); m != nil && (!anchored || m[0] == clause) {
+		value := m[3]
+		if value == "" && m[4] != "" {
+			value = m[4]
+		}
+		setNestedArrayLeaf(root, m[1], m[2], value)
+		return true
+	}
+	return false
 }
 
 func setNestedPath(root map[string]any, path []string, value string) {
@@ -292,6 +390,26 @@ func setNestedPath(root map[string]any, path []string, value string) {
 		node = next
 	}
 	node[path[len(path)-1]] = value
+}
+
+// setNestedArrayLeaf handles the contains(...*.leaf...) shape: basePath's
+// last segment is the array field itself (e.g. "pull_request.labels" ->
+// object nesting "pull_request", then an array field "labels"), set to a
+// one-element array carrying leaf: value — just enough for act's `.*.`
+// glob-and-flatten to produce [value], which contains() then matches.
+func setNestedArrayLeaf(root map[string]any, basePath, leaf, value string) {
+	segments := strings.Split(basePath, ".")
+	arrayField := segments[len(segments)-1]
+	node := root
+	for _, key := range segments[:len(segments)-1] {
+		next, ok := node[key].(map[string]any)
+		if !ok {
+			next = map[string]any{}
+			node[key] = next
+		}
+		node = next
+	}
+	node[arrayField] = []any{map[string]any{leaf: value}}
 }
 
 func parseDispatchInputs(n *yaml.Node) []DispatchInput {

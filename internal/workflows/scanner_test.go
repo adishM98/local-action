@@ -178,6 +178,9 @@ jobs:
 	if workflows[0].AutoEventPayload != "" {
 		t.Errorf("expected no auto payload for an || condition, got %q", workflows[0].AutoEventPayload)
 	}
+	if !workflows[0].NeedsEventPayload {
+		t.Error("expected NeedsEventPayload true — the condition references github.event.*, it just couldn't be auto-solved")
+	}
 }
 
 func TestParseWorkflowFile_NoAutoPayloadWhenNoIfCondition(t *testing.T) {
@@ -189,6 +192,9 @@ func TestParseWorkflowFile_NoAutoPayloadWhenNoIfCondition(t *testing.T) {
 	}
 	if workflows[0].AutoEventPayload != "" {
 		t.Errorf("expected no auto payload without an if: condition, got %q", workflows[0].AutoEventPayload)
+	}
+	if workflows[0].NeedsEventPayload {
+		t.Error("expected NeedsEventPayload false — there's no if: condition at all, nothing depends on event data")
 	}
 }
 
@@ -208,6 +214,35 @@ jobs:
 	}
 	if workflows[0].AutoEventPayload != "" {
 		t.Errorf("expected no auto payload for a non github.event.* comparison, got %q", workflows[0].AutoEventPayload)
+	}
+	if workflows[0].NeedsEventPayload {
+		t.Error("expected NeedsEventPayload false — the condition doesn't reference github.event.* at all")
+	}
+}
+
+// TestParseWorkflowFile_NeedsEventPayloadTrueWhenSolved guards the case
+// where auto-detection DID succeed: NeedsEventPayload should still be true
+// (the workflow genuinely depends on event data), even though the frontend
+// won't show a manual field here since AutoEventPayload is already set.
+func TestParseWorkflowFile_NeedsEventPayloadTrueWhenSolved(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", `name: CI
+on: push
+jobs:
+  build:
+    if: ${{ github.event.action == 'opened' }}
+    runs-on: ubuntu-latest
+    steps: []
+`)
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	if !workflows[0].NeedsEventPayload {
+		t.Error("expected NeedsEventPayload true for a solved github.event.* condition")
+	}
+	if workflows[0].AutoEventPayload == "" {
+		t.Fatal("expected AutoEventPayload to be solved for this simple condition")
 	}
 }
 
@@ -232,6 +267,115 @@ jobs:
 	want := `{"action":"opened"}`
 	if workflows[0].AutoEventPayload != want {
 		t.Errorf("got %q, want %q", workflows[0].AutoEventPayload, want)
+	}
+}
+
+// TestParseWorkflowFile_AutoSolvesContainsLabelCheck covers the most common
+// real-world "only run when this PR has label X" idiom, which uses
+// contains() over the labels.*.name glob rather than a plain equality —
+// distinct from (and more common than) the single github.event.label.name
+// == 'x' case already covered above.
+func TestParseWorkflowFile_AutoSolvesContainsLabelCheck(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", `name: CI
+on: pull_request_target
+jobs:
+  build:
+    if: contains(github.event.pull_request.labels.*.name, 'run-ci')
+    runs-on: ubuntu-latest
+    steps: []
+`)
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	want := `{"pull_request":{"labels":[{"name":"run-ci"}]}}`
+	if workflows[0].AutoEventPayload != want {
+		t.Errorf("got %q, want %q", workflows[0].AutoEventPayload, want)
+	}
+	if !workflows[0].NeedsEventPayload {
+		t.Error("expected NeedsEventPayload true")
+	}
+}
+
+// TestParseWorkflowFile_AutoSolvesCombinedActionAndLabelCheck covers the
+// contains() label check combined via && with a plain equality clause —
+// e.g. gating on both the PR action and a specific label being present.
+func TestParseWorkflowFile_AutoSolvesCombinedActionAndLabelCheck(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", `name: CI
+on: pull_request_target
+jobs:
+  build:
+    if: github.event.action == 'labeled' && contains(github.event.pull_request.labels.*.name, 'run-ci')
+    runs-on: ubuntu-latest
+    steps: []
+`)
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	want2 := `{"action":"labeled","pull_request":{"labels":[{"name":"run-ci"}]}}`
+	if workflows[0].AutoEventPayload != want2 {
+		t.Errorf("got %q, want %q", workflows[0].AutoEventPayload, want2)
+	}
+}
+
+// TestParseWorkflowFile_SuggestsPayloadWhenUnsolvable guards the fallback:
+// an || condition can't be solved outright (a partial solve could produce
+// a payload that makes it evaluate true for the wrong real event), but its
+// individual clauses are still recognizable, so SuggestedEventPayload
+// should seed the manual field with something real instead of a generic
+// unrelated example.
+func TestParseWorkflowFile_SuggestsPayloadWhenUnsolvable(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", `name: CI
+on: pull_request_target
+jobs:
+  build:
+    if: github.event.action == 'labeled' || contains(github.event.pull_request.labels.*.name, 'run-ci')
+    runs-on: ubuntu-latest
+    steps: []
+`)
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	if workflows[0].AutoEventPayload != "" {
+		t.Errorf("expected no confident auto payload for an || condition, got %q", workflows[0].AutoEventPayload)
+	}
+	if !workflows[0].NeedsEventPayload {
+		t.Error("expected NeedsEventPayload true")
+	}
+	wantSuggested := `{"action":"labeled","pull_request":{"labels":[{"name":"run-ci"}]}}`
+	if workflows[0].SuggestedEventPayload != wantSuggested {
+		t.Errorf("SuggestedEventPayload: got %q, want %q", workflows[0].SuggestedEventPayload, wantSuggested)
+	}
+}
+
+// TestParseWorkflowFile_NoSuggestionWhenNothingRecognizable guards against
+// suggestEventPayload fabricating a guess when the condition doesn't
+// contain any pattern it understands (e.g. a function call it doesn't
+// know, over a field it can't parse).
+func TestParseWorkflowFile_NoSuggestionWhenNothingRecognizable(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", `name: CI
+on: pull_request_target
+jobs:
+  build:
+    if: startsWith(github.event.pull_request.title, 'release')
+    runs-on: ubuntu-latest
+    steps: []
+`)
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	if workflows[0].SuggestedEventPayload != "" {
+		t.Errorf("expected no suggestion for an unrecognized function call, got %q", workflows[0].SuggestedEventPayload)
+	}
+	if !workflows[0].NeedsEventPayload {
+		t.Error("expected NeedsEventPayload true — it does reference github.event.*, just not in a pattern we can solve or suggest")
 	}
 }
 

@@ -21,7 +21,7 @@ func TestGitInfo_RealRepo(t *testing.T) {
 	runGit(t, dir, "init", "-b", "main")
 	runGit(t, dir, "commit", "--allow-empty", "-m", "initial")
 
-	branch, sha := gitInfo(dir)
+	branch, sha := GitInfo(dir)
 	if branch != "main" {
 		t.Errorf("branch: got %q, want main", branch)
 	}
@@ -32,14 +32,14 @@ func TestGitInfo_RealRepo(t *testing.T) {
 
 func TestGitInfo_NotAGitRepo(t *testing.T) {
 	dir := t.TempDir()
-	branch, sha := gitInfo(dir)
+	branch, sha := GitInfo(dir)
 	if branch != "" || sha != "" {
 		t.Errorf("expected empty branch/sha for a non-git dir, got branch=%q sha=%q", branch, sha)
 	}
 }
 
 func TestGitInfo_NonExistentPath(t *testing.T) {
-	branch, sha := gitInfo(filepath.Join(t.TempDir(), "does-not-exist"))
+	branch, sha := GitInfo(filepath.Join(t.TempDir(), "does-not-exist"))
 	if branch != "" || sha != "" {
 		t.Errorf("expected empty branch/sha for a missing path, got branch=%q sha=%q", branch, sha)
 	}

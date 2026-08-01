@@ -14,6 +14,7 @@ async function request(method, path, body) {
 export const api = {
   health: () => request('GET', '/api/health'),
   scan: (path) => request('POST', '/api/scan', { path }),
+  repoInfo: (repoPath) => request('GET', `/api/repo-info?repoPath=${encodeURIComponent(repoPath)}`),
   listSecrets: (repoPath, kind) =>
     request('GET', `/api/secrets?repoPath=${encodeURIComponent(repoPath)}&kind=${kind}`),
   upsertSecret: (repoPath, kind, key, value, workflowFile = '') =>

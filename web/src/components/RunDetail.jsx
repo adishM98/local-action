@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { X } from 'lucide-react'
 import { api } from '../api.js'
 import StatusIcon, { StatusBadge } from './StatusIcon.jsx'
 import { relativeTime, duration, formatDurationMs } from '../format.js'
@@ -119,7 +120,7 @@ export default function RunDetail({ runId, onClose, onOpenRun }) {
   return (
     <div className="run-detail">
       <button className="drawer__close" onClick={onClose} title="Close" aria-label="Close">
-        ✕
+        <X size={14} />
       </button>
       <div className="run-detail__head">
         <StatusBadge status={run?.status} />

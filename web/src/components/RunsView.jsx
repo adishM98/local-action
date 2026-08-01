@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
+import { Search, Users, CheckCircle2, XCircle, Loader2, CircleSlash, Clock } from 'lucide-react'
 import { api } from '../api.js'
 import StatusIcon, { StatusCircle } from './StatusIcon.jsx'
 import RunWorkflowMenu from './RunWorkflowMenu.jsx'
-import { relativeTime, duration, formatDurationMs, computeRunStats, filterRuns, branchColorClass } from '../format.js'
+import { relativeTime, duration, formatDurationMs, computeRunStats, filterRuns } from '../format.js'
 
 const STATUS_OPTIONS = ['success', 'failed', 'running', 'queued', 'cancelled']
 const STATUS_LABEL = { success: 'Passed', failed: 'Failed', running: 'Running', queued: 'Queued', cancelled: 'Cancelled' }
@@ -64,7 +65,9 @@ export default function RunsView({ repoPath, workflows, workflowFile, health, ru
       {visible.length > 0 && (
         <div className="toolbar">
           <div className="toolbar__search-wrap">
-            <span className="toolbar__search-icon">🔍</span>
+            <span className="toolbar__search-icon">
+              <Search size={14} />
+            </span>
             <input
               className="toolbar__search"
               placeholder="Filter workflow runs…"
@@ -188,9 +191,7 @@ function RunRow({ run, name, onOpen }) {
         </span>
         <span className="run-row__meta">{run.event} · {relativeTime(run.createdAt)}</span>
       </span>
-      {run.branch && (
-        <span className={`branch-pill branch-pill--${branchColorClass(run.branch)}`}>{run.branch}</span>
-      )}
+      {run.branch && <span className="branch-pill">{run.branch}</span>}
       <span className="run-row__duration">{duration(run)}</span>
       <div className="run-row__overflow" ref={menuRef} onClick={(e) => e.stopPropagation()}>
         <button className="run-row__overflow-btn" onClick={() => setMenuOpen(!menuOpen)} title="More actions">
@@ -243,32 +244,32 @@ function StatCards({ runs }) {
   return (
     <div className="stat-cards">
       <div className="stat-card">
-        <span className="stat-card__label">👤 Total runs</span>
+        <span className="stat-card__label"><Users size={12} /> Total runs</span>
         <span className="stat-card__value">{stats.total}</span>
         <span className="stat-card__sub">All time</span>
       </div>
       <div className="stat-card stat-card--passed">
-        <span className="stat-card__label">✓ Successful</span>
+        <span className="stat-card__label"><CheckCircle2 size={12} /> Successful</span>
         <span className="stat-card__value">{stats.passed}</span>
         <span className="stat-card__sub">{pct(stats.passed)}</span>
       </div>
       <div className="stat-card stat-card--failed">
-        <span className="stat-card__label">✕ Failed</span>
+        <span className="stat-card__label"><XCircle size={12} /> Failed</span>
         <span className="stat-card__value">{stats.failed}</span>
         <span className="stat-card__sub">{pct(stats.failed)}</span>
       </div>
       <div className="stat-card stat-card--running">
-        <span className="stat-card__label">◔ In progress</span>
+        <span className="stat-card__label"><Loader2 size={12} /> In progress</span>
         <span className="stat-card__value">{stats.running}</span>
         <span className="stat-card__sub">{pct(stats.running)}</span>
       </div>
       <div className="stat-card">
-        <span className="stat-card__label">⊘ Cancelled</span>
+        <span className="stat-card__label"><CircleSlash size={12} /> Cancelled</span>
         <span className="stat-card__value">{stats.cancelled}</span>
         <span className="stat-card__sub">{pct(stats.cancelled)}</span>
       </div>
       <div className="stat-card">
-        <span className="stat-card__label">⏱ Avg. duration</span>
+        <span className="stat-card__label"><Clock size={12} /> Avg. duration</span>
         <span className="stat-card__value">{stats.avgDurationMs != null ? formatDurationMs(stats.avgDurationMs) : '—'}</span>
         <span className="stat-card__sub">&nbsp;</span>
       </div>

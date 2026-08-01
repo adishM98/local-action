@@ -67,7 +67,7 @@ func encodeInputs(m map[string]string) string {
 }
 
 func (e *Engine) Enqueue(req RunRequest) (int64, error) {
-	branch, sha := gitInfo(req.RepoPath)
+	branch, sha := GitInfo(req.RepoPath)
 	runID, err := CreateRun(e.db, Run{
 		RepoPath:     req.RepoPath,
 		WorkflowFile: req.WorkflowFile,

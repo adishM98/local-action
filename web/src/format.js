@@ -35,6 +35,9 @@ export function duration(run) {
 // already-loaded runs list — no separate API call. avgDurationMs is only
 // computed over runs with both startedAt and finishedAt set (a run still
 // in progress has no finishedAt yet and would skew the average).
+// avgQueueMs is the average wait between a run being created and actually
+// starting (only over runs that have started — a still-queued run's wait
+// isn't over yet and would understate the average).
 export function computeRunStats(runs) {
   let passed = 0
   let failed = 0
@@ -42,6 +45,8 @@ export function computeRunStats(runs) {
   let cancelled = 0
   let finishedCount = 0
   let finishedTotalMs = 0
+  let queuedCount = 0
+  let queuedTotalMs = 0
 
   for (const run of runs) {
     if (run.status === 'success') passed++
@@ -55,6 +60,10 @@ export function computeRunStats(runs) {
       finishedCount++
       finishedTotalMs += (end - start) * 1000
     }
+    if (start != null && run.createdAt != null) {
+      queuedCount++
+      queuedTotalMs += Math.max(0, start - run.createdAt) * 1000
+    }
   }
 
   return {
@@ -64,22 +73,76 @@ export function computeRunStats(runs) {
     running,
     cancelled,
     avgDurationMs: finishedCount ? Math.round(finishedTotalMs / finishedCount) : null,
+    avgQueueMs: queuedCount ? Math.round(queuedTotalMs / queuedCount) : null,
   }
 }
 
-const BRANCH_COLORS = ['blue', 'purple', 'green', 'orange', 'pink']
-
-// branchColorClass deterministically maps a branch name to one of a small
-// fixed palette (same branch always renders the same color; different
-// branches usually land on different ones) — a CSS class suffix for
-// .branch-pill--<color>. No color for an empty branch (nothing to render).
-export function branchColorClass(branch) {
-  if (!branch) return ''
-  let hash = 0
-  for (let i = 0; i < branch.length; i++) {
-    hash = (hash * 31 + branch.charCodeAt(i)) | 0
+// longestRunningWorkflow returns the single longest-running finished run
+// (by wall-clock duration), with its display name resolved via resolveName,
+// or null if nothing has finished yet.
+export function longestRunningWorkflow(runs, resolveName) {
+  let best = null
+  for (const run of runs) {
+    const start = unwrap(run.startedAt)
+    const end = unwrap(run.finishedAt)
+    if (start == null || end == null) continue
+    const durationMs = (end - start) * 1000
+    if (!best || durationMs > best.durationMs) {
+      best = { name: resolveName(run), durationMs }
+    }
   }
-  return BRANCH_COLORS[Math.abs(hash) % BRANCH_COLORS.length]
+  return best
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+// dailyTrend buckets runs into the last `days` calendar days (local time,
+// oldest first) and computes each day's success rate over its terminal
+// (success/failed) runs. A day with no terminal runs gets pct: null so the
+// caller can render it as an empty bar instead of a misleading 0%.
+export function dailyTrend(runs, days = 7) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const buckets = Array.from({ length: days }, (_, i) => {
+    const date = new Date(today.getTime() - (days - 1 - i) * DAY_MS)
+    return { date, passed: 0, failed: 0 }
+  })
+
+  for (const run of runs) {
+    if (run.status !== 'success' && run.status !== 'failed') continue
+    const created = new Date(run.createdAt * 1000)
+    created.setHours(0, 0, 0, 0)
+    const bucket = buckets.find((b) => b.date.getTime() === created.getTime())
+    if (!bucket) continue
+    if (run.status === 'success') bucket.passed++
+    else bucket.failed++
+  }
+
+  return buckets.map((b) => {
+    const total = b.passed + b.failed
+    return { date: b.date, pct: total ? Math.round((b.passed / total) * 100) : null }
+  })
+}
+
+// lastRunByWorkflow maps each workflow file to its most recent run object.
+// Assumes runs is already newest-first (ListRuns orders by created_at
+// DESC), so the first occurrence per file wins. A workflow with no entry
+// has never been run.
+export function lastRunByWorkflow(runs) {
+  const byFile = {}
+  for (const run of runs) {
+    if (!(run.workflowFile in byFile)) byFile[run.workflowFile] = run
+  }
+  return byFile
+}
+
+// lastStatusByWorkflow maps each workflow file to the status of its most
+// recent run.
+export function lastStatusByWorkflow(runs) {
+  const byFile = lastRunByWorkflow(runs)
+  const statuses = {}
+  for (const file in byFile) statuses[file] = byFile[file].status
+  return statuses
 }
 
 // filterRuns applies the runs-list toolbar filters. search matches

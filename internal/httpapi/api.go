@@ -78,6 +78,12 @@ func NewRouter(db *sql.DB, key []byte, engine *runs.Engine, hub *ws.Hub, actBin 
 		writeJSON(w, http.StatusOK, workflowList)
 	})
 
+	mux.HandleFunc("GET /api/repo-info", func(w http.ResponseWriter, r *http.Request) {
+		repoPath := r.URL.Query().Get("repoPath")
+		branch, commitSha := runs.GitInfo(repoPath)
+		writeJSON(w, http.StatusOK, map[string]string{"branch": branch, "commitSha": commitSha})
+	})
+
 	mux.HandleFunc("GET /api/secrets", func(w http.ResponseWriter, r *http.Request) {
 		repoPath := r.URL.Query().Get("repoPath")
 		kind := secrets.SecretKind(r.URL.Query().Get("kind"))

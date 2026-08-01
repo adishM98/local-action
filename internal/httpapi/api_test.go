@@ -122,6 +122,63 @@ func TestAPI_ScanSecretsAndRunLifecycle(t *testing.T) {
 	}
 }
 
+func TestAPI_RepoInfo_ReturnsBranchAndCommit(t *testing.T) {
+	repoDir := t.TempDir()
+	runGit(t, repoDir, "init", "-b", "feature/repo-info")
+	runGit(t, repoDir, "commit", "--allow-empty", "-m", "initial")
+
+	stubDir := t.TempDir()
+	stubPath := filepath.Join(stubDir, "fake-act.sh")
+	if err := os.WriteFile(stubPath, []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
+		t.Fatalf("write stub: %v", err)
+	}
+	mux, _, _ := newTestRouter(t, stubPath)
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/api/repo-info?repoPath=" + repoDir)
+	if err != nil {
+		t.Fatalf("get repo-info: %v", err)
+	}
+	defer resp.Body.Close()
+	var got struct {
+		Branch    string `json:"branch"`
+		CommitSha string `json:"commitSha"`
+	}
+	json.NewDecoder(resp.Body).Decode(&got)
+	if got.Branch != "feature/repo-info" {
+		t.Fatalf("branch: got %q, want feature/repo-info", got.Branch)
+	}
+	if len(got.CommitSha) < 7 {
+		t.Fatalf("commitSha: got %q, expected a short hash", got.CommitSha)
+	}
+}
+
+func TestAPI_RepoInfo_NotAGitRepo(t *testing.T) {
+	stubDir := t.TempDir()
+	stubPath := filepath.Join(stubDir, "fake-act.sh")
+	if err := os.WriteFile(stubPath, []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
+		t.Fatalf("write stub: %v", err)
+	}
+	mux, _, _ := newTestRouter(t, stubPath)
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/api/repo-info?repoPath=" + t.TempDir())
+	if err != nil {
+		t.Fatalf("get repo-info: %v", err)
+	}
+	defer resp.Body.Close()
+	var got struct {
+		Branch    string `json:"branch"`
+		CommitSha string `json:"commitSha"`
+	}
+	json.NewDecoder(resp.Body).Decode(&got)
+	if got.Branch != "" || got.CommitSha != "" {
+		t.Fatalf("expected empty branch/commitSha for a non-git dir, got %+v", got)
+	}
+}
+
 func TestAPI_GetRun_NotFound(t *testing.T) {
 	stubDir := t.TempDir()
 	stubPath := filepath.Join(stubDir, "fake-act.sh")

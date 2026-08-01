@@ -7,10 +7,10 @@ import (
 	"time"
 )
 
-// gitInfo returns the current branch and short commit SHA checked out at
+// GitInfo returns the current branch and short commit SHA checked out at
 // repoPath, or ("", "") if repoPath isn't a git repo, git isn't installed,
 // or the lookup times out — never fails the run over this being unset.
-func gitInfo(repoPath string) (branch, sha string) {
+func GitInfo(repoPath string) (branch, sha string) {
 	branch = gitOutput(repoPath, "rev-parse", "--abbrev-ref", "HEAD")
 	sha = gitOutput(repoPath, "rev-parse", "--short", "HEAD")
 	return branch, sha
