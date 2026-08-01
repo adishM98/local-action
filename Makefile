@@ -13,13 +13,15 @@ run: build
 	./local-action
 
 # Runs backend + frontend dev server together. Ctrl-C stops both. The trap
-# is installed immediately after backgrounding the backend (before the
-# long-running `npm run dev` starts), and is the only cleanup — no separate
-# trailing `kill`, since the trap already fires on normal exit too.
+# is installed before backgrounding the backend, using single-quoted
+# (deferred-expansion) syntax so `$BACKEND` is read at signal-time rather than
+# trap-install-time — safe even though $BACKEND isn't set yet when the trap is
+# installed. It's the only cleanup — no separate trailing `kill`, since the
+# trap already fires on normal exit too.
 dev:
-	@go run ./cmd/local-action & \
+	@trap 'kill $${BACKEND:-0} 2>/dev/null' EXIT INT TERM; \
+	go run ./cmd/local-action & \
 	BACKEND=$$!; \
-	trap "kill $$BACKEND 2>/dev/null" EXIT INT TERM; \
 	cd $(WEB_DIR) && npm run dev
 
 test:
@@ -27,7 +29,7 @@ test:
 	cd $(WEB_DIR) && npm test
 
 lint:
-	gofmt -l .
+	@test -z "$$(gofmt -l .)" || { gofmt -l .; echo "unformatted files; run 'make fmt'"; exit 1; }
 	go vet ./...
 
 fmt:

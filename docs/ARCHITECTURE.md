@@ -24,22 +24,22 @@ Backend logic is split into domain packages under `internal/` (`db`, `secrets`, 
 ## Request flow: triggering a run
 
 1. Browser `POST /api/runs` with `{repoPath, workflowFile, event, inputs}`.
-2. `Engine.Enqueue` (actrunner.go) inserts a `queued` row via `CreateRun` (runs.go) and pushes onto a buffered channel.
+2. `Engine.Enqueue` (internal/runs/actrunner.go) inserts a `queued` row via `CreateRun` (internal/runs/runs.go) and pushes onto a buffered channel.
 3. The engine's single worker goroutine (`Engine.worker`) pops the run, exclusively — only one `act` process ever runs at a time.
-4. `runOne` writes the repo's secrets/vars to short-lived `0600` temp dotenv files (`writeDotenvTemp`), builds the `act` argv (`BuildArgv`, actrunner_argv.go), and spawns `act` with `cmd.Dir = repoPath`.
-5. `act`'s stdout/stderr are streamed line-by-line into two places: `AppendRunLog` (persisted to SQLite `run_logs`) and `Hub.Broadcast` (live WebSocket fan-out to any connected client, `ws.go`).
+4. `runOne` writes the repo's secrets/vars to short-lived `0600` temp dotenv files (`writeDotenvTemp`), builds the `act` argv (`BuildArgv`, internal/runs/actrunner_argv.go), and spawns `act` with `cmd.Dir = repoPath`.
+5. `act`'s stdout/stderr are streamed line-by-line into two places: `AppendRunLog` (persisted to SQLite `run_logs`) and `Hub.Broadcast` (live WebSocket fan-out to any connected client, `internal/ws/ws.go`).
 6. On exit, the run's status is set to `success`/`failed`/`cancelled` (`UpdateRunStatus`), temp files are removed, and `Hub.Forget` releases the in-memory WebSocket buffer for that run (the DB remains the durable source of truth for replay).
 
 ## Request flow: viewing a run's logs
 
-- `GET /api/runs/{id}` returns `{run, logs}` — `logs` is the full persisted log from SQLite, used by the frontend (`LogViewer.jsx`) to backfill anything that happened before the viewer connected, for runs that have already reached a terminal state.
+- `GET /api/runs/{id}` returns `{run, logs}` — `logs` is the full persisted log from SQLite, used by the frontend (`RunDetail.jsx`) to backfill anything that happened before the viewer connected, for runs that have already reached a terminal state.
 - `GET /ws/runs/{id}` upgrades to a WebSocket. The hub replays whatever it still has buffered for that run (only meaningful while the run is active or very recently finished — buffers are freed on completion) and then streams new lines live.
 
 ## Concurrency invariants
 
 - **One `act` process at a time.** Enforced structurally: a single buffered channel drained by a single worker goroutine (`Engine.worker`). No locking needed for exclusion — there's simply one consumer.
 - **`db.SetMaxOpenConns(1)` + `PRAGMA busy_timeout=5000`** (`internal/db/db.go`). `modernc.org/sqlite` has no built-in wait-on-lock behavior across multiple pooled connections; the concurrent writers this app has (log-streaming goroutines, status updates, HTTP reads) would otherwise intermittently hit `SQLITE_BUSY`. Forcing everything through one connection with a busy timeout serializes access safely. Fine for this app's scale (single local user).
-- **`e.running` map** (actrunner.go) is guarded by a mutex on every access (registration, `Cancel`, deletion). The process is registered in the map *before* the DB status flips to `running`, so a client that observes "running" via polling can never race ahead of `Cancel()`'s ability to find and kill the process.
+- **`e.running` map** (internal/runs/actrunner.go) is guarded by a mutex on every access (registration, `Cancel`, deletion). The process is registered in the map *before* the DB status flips to `running`, so a client that observes "running" via polling can never race ahead of `Cancel()`'s ability to find and kill the process.
 - **WebSocket hub buffer/registration** happen under one lock in `ServeWS`, so a line broadcast concurrently with a new client connecting can't be dropped or double-delivered.
 
 ## Storage
