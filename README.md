@@ -6,7 +6,7 @@ Single user, no auth, no accounts. Meant to run on your own machine or a home se
 
 ## Requirements
 
-- **Go 1.22+** (only if building from source)
+- **Go 1.25+** (only if building from source)
 - **Docker**, installed and running
 - **[`act`](https://github.com/nektos/act)**, installed and on your `PATH` (`act --version` should work)
 - **Node.js + npm** (only if rebuilding the frontend)
@@ -42,11 +42,14 @@ Flags:
 
 ## Using it
 
-1. **Workflows tab** — enter the absolute path to a local repo (must contain `.github/workflows/`), click Scan. Pick a workflow, pick which trigger event to simulate, fill in any `workflow_dispatch` inputs, click Run.
-2. **Secrets tab** — add secrets/vars scoped to that repo path. Values are encrypted at rest and injected into the run as a temporary dotenv file, deleted immediately after the run finishes.
-3. **History tab** — see past and in-progress runs for the current repo path. Click one to watch its log stream live (or read back the full log if it already finished).
+1. **Point it at a repo** — click the repo name/path in the header, enter the absolute path to a local repo (must contain `.github/workflows/`). Shows the repo's current branch, and Docker/`act` health.
+2. **Overview** — the landing page: workflow/running/failed/passing counts, currently-running and recent-failure widgets, a recent-runs feed, repository health (success rate, avg build/queue time, longest run), a 7-day success-rate trend, and any pinned (⭐) workflows.
+3. **Workflow Explorer** (sidebar) — workflows grouped into categories (CI/Build, Security, Testing, Deployment, Docs), auto-detected from name/path. Search (⌘K) or filter by status (running/failed/success/never run). Pin frequently-used workflows to Favorites. Drag the right edge to resize, or collapse it entirely.
+4. **Run a workflow** — pick the trigger event and fill in any `workflow_dispatch` inputs (text, choice, or a checkbox for boolean inputs), then click Run. If a job's `if:` condition depends on event data GitHub Actions can't auto-derive locally, an event-payload JSON field appears — pre-filled with a best-effort guess when derivable, otherwise blank for manual entry. A banner warns if the workflow's `runs-on` targets `windows-*`/`macos-*`/`self-hosted` — `act` only emulates Linux runners, so those may fail or diverge from real CI.
+5. **Watch it run** — opens a live log stream (WebSocket) grouped by job/step; re-run or cancel from the same view. Past runs stay in history for the repo.
+6. **Secrets & variables** — add secrets/vars scoped to the repo (optionally to one workflow). Values are encrypted at rest and injected into the run as a temporary dotenv file, deleted immediately after the run finishes.
 
-Runs execute one at a time, FIFO — triggering a second run while one is in progress queues it.
+Runs execute one at a time, FIFO — triggering a second run while one is in progress queues it. The theme toggle (next to Docker/`act` status) switches dark/light; it otherwise follows your OS preference.
 
 ## Building the frontend
 
