@@ -16,6 +16,14 @@ brew install adishM98/local-action/local-action
 
 Installs `act` automatically as a dependency. Still needs Docker installed and running separately.
 
+Then start it:
+
+```bash
+local-action
+```
+
+Open `http://localhost:8090`.
+
 ### Or a prebuilt binary directly (macOS)
 
 ```bash
