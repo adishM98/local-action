@@ -246,7 +246,15 @@ jobs:
 	}
 }
 
-func TestParseWorkflowFile_AutoPayloadUsesFirstSolvableJob(t *testing.T) {
+// TestParseWorkflowFile_OneUnsolvableJobDemotesWholeWorkflowToSuggested
+// guards against a real bug: a workflow with several jobs where only ONE
+// job's condition happens to fully solve (e.g. a single contains() check,
+// no ||) must NOT be treated as confidently auto-solved for the whole
+// workflow — the other, unsolved job(s) may depend on different event data
+// entirely, and using just the one solvable job's narrow payload both hides
+// the manual-entry field those jobs still need and silently drops their
+// labels. It should fall back to a merged best-effort suggestion instead.
+func TestParseWorkflowFile_OneUnsolvableJobDemotesWholeWorkflowToSuggested(t *testing.T) {
 	repo := t.TempDir()
 	writeWorkflow(t, repo, "ci.yml", `name: CI
 on: push
@@ -264,9 +272,12 @@ jobs:
 	if err != nil {
 		t.Fatalf("scan: %v", err)
 	}
+	if workflows[0].AutoEventPayload != "" {
+		t.Errorf("expected no confident auto payload when one job's condition is unsolvable, got %q", workflows[0].AutoEventPayload)
+	}
 	want := `{"action":"opened"}`
-	if workflows[0].AutoEventPayload != want {
-		t.Errorf("got %q, want %q", workflows[0].AutoEventPayload, want)
+	if workflows[0].SuggestedEventPayload != want {
+		t.Errorf("SuggestedEventPayload: got %q, want %q", workflows[0].SuggestedEventPayload, want)
 	}
 }
 

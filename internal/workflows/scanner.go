@@ -250,22 +250,26 @@ var (
 	githubEventRe   = regexp.MustCompile(`github\.event\.`)
 )
 
-// autoEventPayloadFromJobs scans each job's if: condition for the first one
-// that fully solves (see solveIfCondition), and returns its JSON payload
-// (act's -e/--eventpath shape) so the condition evaluates true without the
-// user hand-writing it. If nothing fully solves but some condition still
-// references github.event.*, suggested merges the recognizable clauses from
-// EVERY job's condition (not just the first) into one best-effort payload —
-// a workflow's jobs often gate on different label sets (e.g. a build job on
-// "run-cypress-ce", a deploy job on "run-cypress-ce-deployments"), so only
-// looking at the first job silently dropped the rest. needsPayload is true
-// whenever a condition references github.event.* at all, solved or not.
+// autoEventPayloadFromJobs merges the recognizable clauses from EVERY job's
+// if: condition (not just the first) into one payload — a workflow's jobs
+// commonly gate on different label sets (e.g. a build job on "run-cypress",
+// a deploy job on "run-cypress-deployments"), so looking at only one job
+// would silently drop the rest. The merged payload is returned as the
+// confident payload (act's -e/--eventpath shape, ready to use without
+// disclaimer) only when EVERY scanned condition fully solves on its own
+// (see solveIfCondition) — if even one job's condition can't be fully
+// solved (e.g. it uses ||), the whole merged result is returned as
+// suggested instead: using just the one job that happens to solve trivially
+// would both hide the manual-entry field the other jobs still need AND
+// throw away their labels. needsPayload is true whenever a condition
+// references github.event.* at all, solved or not.
 func autoEventPayloadFromJobs(jobsNode *yaml.Node) (payload, suggested string, needsPayload bool) {
 	if jobsNode.Kind != yaml.MappingNode {
 		return "", "", false
 	}
 	root := map[string]any{}
 	found := false
+	allSolved := true
 	for i := 0; i < len(jobsNode.Content); i += 2 {
 		jobNode := jobsNode.Content[i+1]
 		if jobNode.Kind != yaml.MappingNode {
@@ -282,26 +286,26 @@ func autoEventPayloadFromJobs(jobsNode *yaml.Node) (payload, suggested string, n
 			if !githubEventRe.MatchString(ifValue.Value) {
 				continue
 			}
-			if payload == "" {
-				if solved, ok := solveIfCondition(ifValue.Value); ok {
-					payload = solved
-				}
-			}
 			needsPayload = true
+			if _, ok := solveIfCondition(ifValue.Value); !ok {
+				allSolved = false
+			}
 			if mergeEventPayloadClauses(root, ifValue.Value) {
 				found = true
 			}
 		}
 	}
-	if payload != "" {
-		return payload, "", true
+	if !found {
+		return "", "", needsPayload
 	}
-	if found {
-		if b, err := json.Marshal(root); err == nil {
-			suggested = string(b)
-		}
+	b, err := json.Marshal(root)
+	if err != nil {
+		return "", "", needsPayload
 	}
-	return "", suggested, needsPayload
+	if allSolved {
+		return string(b), "", true
+	}
+	return "", string(b), true
 }
 
 // solveIfCondition fully solves cond only when it's a plain conjunction

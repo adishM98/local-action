@@ -307,7 +307,9 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 .sidebar__item--flat { display: flex; align-items: center; gap: 8px; }
 /* Application-nav items (Overview, Secrets) read as medium weight — a
    step below the bold repo name, a step above regular workflow rows. */
-.sidebar__item--nav { font-weight: 500; }
+.sidebar__item--nav { font-weight: 500; padding-top: 7px; padding-bottom: 7px; }
+.sidebar__item--nav + .sidebar__item--nav { margin-top: 2px; }
+.sidebar__item--nav:last-of-type { margin-bottom: 10px; }
 
 .sidebar__search-wrap { position: relative; display: flex; align-items: center; margin: 12px 0 6px; }
 .sidebar__search-icon { position: absolute; left: 8px; color: var(--muted); pointer-events: none; }
