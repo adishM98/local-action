@@ -25,8 +25,11 @@ Other targets:
 |---|---|
 | `make build` | Build frontend + binary, don't run |
 | `make dev` | Backend (`go run .`) + frontend dev server (hot reload) together, Ctrl-C stops both |
-| `make test` | `go test ./...` |
-| `make fmt` | `gofmt -l .` + `go vet ./...` |
+| `make test` | `go test ./...` + frontend unit tests (`npm test`) |
+| `make lint` | `gofmt -l .` + `go vet ./...` (check only, doesn't modify files) |
+| `make fmt` | `gofmt -w .` — formats Go files in place |
+| `make install` | Install Go + npm dependencies, no build |
+| `make db-reset` | Remove the local SQLite DB (run history + secrets), keep the binary and built frontend |
 | `make clean` | Remove the binary, local DB, built frontend, and `node_modules` |
 
 Flags:
@@ -89,8 +92,9 @@ docs/                   architecture notes, design spec, implementation plan
 ## Development
 
 ```bash
-make test   # go test ./...
-make fmt    # gofmt -l . && go vet ./...
+make test   # go test ./... + npm test
+make lint   # gofmt -l . && go vet ./... (check only)
+make fmt    # gofmt -w . (formats in place)
 ```
 
 See `docs/ARCHITECTURE.md` for how the pieces fit together, and `docs/superpowers/` for the original design spec and implementation plan.

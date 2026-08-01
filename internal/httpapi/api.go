@@ -91,11 +91,11 @@ func NewRouter(db *sql.DB, key []byte, engine *runs.Engine, hub *ws.Hub, actBin 
 
 	mux.HandleFunc("POST /api/secrets", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
-			RepoPath     string            `json:"repoPath"`
+			RepoPath     string             `json:"repoPath"`
 			Kind         secrets.SecretKind `json:"kind"`
-			Key          string            `json:"key"`
-			Value        string            `json:"value"`
-			WorkflowFile string            `json:"workflowFile"`
+			Key          string             `json:"key"`
+			Value        string             `json:"value"`
+			WorkflowFile string             `json:"workflowFile"`
 		}
 		if err := readJSON(r, &body); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -110,10 +110,10 @@ func NewRouter(db *sql.DB, key []byte, engine *runs.Engine, hub *ws.Hub, actBin 
 
 	mux.HandleFunc("DELETE /api/secrets", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
-			RepoPath     string            `json:"repoPath"`
+			RepoPath     string             `json:"repoPath"`
 			Kind         secrets.SecretKind `json:"kind"`
-			Key          string            `json:"key"`
-			WorkflowFile string            `json:"workflowFile"`
+			Key          string             `json:"key"`
+			WorkflowFile string             `json:"workflowFile"`
 		}
 		if err := readJSON(r, &body); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
