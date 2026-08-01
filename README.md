@@ -8,15 +8,25 @@ Single user, no auth, no accounts. Meant to run on your own machine or a home se
 
 ## Install
 
-### macOS (Apple Silicon + Intel), via Homebrew
+### macOS, via Homebrew (recommended)
 
 ```bash
-brew install --cask adishM98/local-action/local-action
+brew install adishM98/local-action/local-action
 ```
 
-Also needs `act` (`brew install act`, declared as a cask dependency) and Docker Desktop or equivalent, running. The installed app is a plain launcher, not a menu-bar app: double-click opens the UI in your browser; quitting from the Dock stops the server. See [docs/RELEASE.md](docs/RELEASE.md) for how it's built and where it stores its data.
+Installs `act` automatically as a dependency. Still needs Docker installed and running separately.
 
-No direct DMG download is offered right now — Homebrew-only for the packaged app. For any other platform, or to hack on the source, see below.
+### Or a prebuilt binary directly (macOS)
+
+```bash
+curl -L -o local-action https://github.com/adishM98/local-action/releases/latest/download/local-action_<version>_darwin_arm64   # or _amd64 on Intel
+chmod +x local-action
+./local-action
+```
+
+Needs `act` and Docker installed and running separately — see [Requirements](#requirements) below (`make bootstrap` from a cloned checkout can install those even if you're not building the binary yourself). See [docs/RELEASE.md](docs/RELEASE.md) for how releases are built.
+
+For any other platform, or to hack on the source, see below.
 
 ## Requirements
 
@@ -54,7 +64,7 @@ Other targets:
 | `make install` | Install Go + npm dependencies, no build |
 | `make db-reset` | Remove the local SQLite DB (run history + secrets), keep the binary and built frontend |
 | `make clean` | Remove the binary, local DB, built frontend, and `node_modules` |
-| `make release-macos VERSION=x.y.z` | Build the macOS `.app` + DMG (universal binary) for the Homebrew cask — see [docs/RELEASE.md](docs/RELEASE.md) |
+| `make release-macos VERSION=x.y.z` | Build prebuilt macOS binaries (arm64+amd64) for a GitHub release — see [docs/RELEASE.md](docs/RELEASE.md) |
 
 Flags:
 
@@ -108,8 +118,8 @@ internal/
   httpapi/              HTTP route wiring
 testdata/sample-repo/   a real workflow file, for manual end-to-end testing
 docs/                   architecture notes, design spec, user guide, release process
-scripts/                bootstrap.sh (dev setup), release-macos.sh (DMG packaging)
-homebrew-tap/           Casks/local-action.rb — synced into the separate homebrew-local-action tap repo on release
+scripts/                bootstrap.sh (dev setup), release-macos.sh (prebuilt-binary releases)
+homebrew-tap/           Formula/local-action.rb — synced into the separate homebrew-local-action tap repo on release
 ```
 
 ## Security
@@ -126,7 +136,7 @@ make lint   # gofmt -l . && go vet ./... (check only)
 make fmt    # gofmt -w . (formats in place)
 ```
 
-See `docs/ARCHITECTURE.md` for how the pieces fit together, and `docs/superpowers/` for the original design spec and implementation plan. See [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) for a full walkthrough of every screen and feature, and [`docs/RELEASE.md`](docs/RELEASE.md) for how the macOS DMG/cask are built and published. Contributions welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
+See `docs/ARCHITECTURE.md` for how the pieces fit together, and `docs/superpowers/` for the original design spec and implementation plan. See [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) for a full walkthrough of every screen and feature, and [`docs/RELEASE.md`](docs/RELEASE.md) for how prebuilt macOS binaries are built and published. Contributions welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
