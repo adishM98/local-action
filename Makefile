@@ -1,7 +1,7 @@
 WEB_DIR := web
 WEB_SRC := $(shell find $(WEB_DIR)/src -type f) $(WEB_DIR)/package.json $(WEB_DIR)/vite.config.js $(WEB_DIR)/index.html
 
-.PHONY: bootstrap build run dev test lint fmt install db-reset clean
+.PHONY: bootstrap build run dev test lint fmt install db-reset clean release-macos
 
 bootstrap:
 	./scripts/bootstrap.sh
@@ -47,4 +47,9 @@ db-reset:
 
 clean:
 	rm -f local-action local-action.db
-	rm -rf $(WEB_DIR)/dist $(WEB_DIR)/node_modules
+	rm -rf $(WEB_DIR)/dist $(WEB_DIR)/node_modules build/
+
+# make release-macos VERSION=0.1.0
+release-macos:
+	@test -n "$(VERSION)" || { echo "usage: make release-macos VERSION=0.1.0"; exit 1; }
+	./scripts/release-macos.sh $(VERSION)
