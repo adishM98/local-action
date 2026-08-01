@@ -16,6 +16,49 @@
   --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
 }
 
+/* Light theme — system preference first, explicit [data-theme] (the toggle
+   button) always wins over it since it comes later in the cascade. State
+   colors use GitHub's own light-mode values, not the dark ones re-used —
+   the dark palette's contrast against white is poor (esp. yellow/blue). */
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #ffffff;
+    --panel: #f6f8fa;
+    --panel-2: #eaeef2;
+    --border: #d0d7de;
+    --text: #1f2328;
+    --muted: #656d76;
+    --green: #1a7f37;
+    --red: #cf222e;
+    --yellow: #9a6700;
+    --blue: #0969da;
+  }
+}
+:root[data-theme='dark'] {
+  --bg: #0a0a0a;
+  --panel: #151515;
+  --panel-2: #1d1d1d;
+  --border: #2a2a2a;
+  --text: #e8e8e6;
+  --muted: #8a8a86;
+  --green: #3fb950;
+  --red: #f85149;
+  --yellow: #d29922;
+  --blue: #58a6ff;
+}
+:root[data-theme='light'] {
+  --bg: #ffffff;
+  --panel: #f6f8fa;
+  --panel-2: #eaeef2;
+  --border: #d0d7de;
+  --text: #1f2328;
+  --muted: #656d76;
+  --green: #1a7f37;
+  --red: #cf222e;
+  --yellow: #9a6700;
+  --blue: #0969da;
+}
+
 * { box-sizing: border-box; }
 
 /* Lucide icons are inline SVGs — without this they inherit the browser's
@@ -509,10 +552,9 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   font-size: 14px;
 }
 .run-row__overflow-btn:hover { border-color: var(--border); color: var(--text); }
+/* Positioned by Radix's DropdownMenu.Content (portaled to document.body) —
+   no position/top/right here, that's floating-ui's job now. */
 .run-row__overflow-menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 4px);
   z-index: 10;
   min-width: 140px;
   background: var(--panel-2);
@@ -607,6 +649,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   cursor: pointer;
   font-size: 13px;
   font-weight: 600;
+  white-space: nowrap;
   transition: border-color 120ms ease, background-color 120ms ease;
 }
 .btn:hover { border-color: var(--muted); }
@@ -665,11 +708,9 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 }
 
 /* ── Run workflow menu ───────────────────────────────── */
-.run-menu { position: relative; }
+/* Positioned by Radix's Popover.Content (portaled to document.body) — no
+   position/top/right here, that's floating-ui's job now. */
 .run-menu__panel {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 6px);
   z-index: 10;
   width: 320px;
   background: var(--panel);
@@ -727,7 +768,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   margin: 10px 36px 16px 0;
 }
 .run-detail__meta { color: var(--muted); font-size: 13px; flex: 1; }
-.run-detail__actions { display: flex; gap: 8px; }
+.run-detail__actions { display: flex; gap: 8px; flex-shrink: 0; }
 
 .job-card {
   border: 1px solid var(--border);
@@ -782,11 +823,11 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 .step__lines {
   margin: 0;
   padding: 8px 14px 8px 0;
-  background: #080807;
+  background: var(--panel-2);
   font-family: var(--mono);
   font-size: 12px;
   line-height: 1.7;
-  color: #c9d1d9;
+  color: var(--text);
   overflow-x: auto;
   list-style-position: inside;
 }

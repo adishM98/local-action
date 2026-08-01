@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { Search, Users, CheckCircle2, XCircle, Loader2, CircleSlash, Clock } from 'lucide-react'
 import { api } from '../api.js'
 import StatusIcon, { StatusCircle } from './StatusIcon.jsx'
@@ -140,21 +141,9 @@ export default function RunsView({ repoPath, workflows, workflowFile, health, ru
 }
 
 function RunRow({ run, name, onOpen }) {
-  const [menuOpen, setMenuOpen] = useState(false)
-  const menuRef = useRef(null)
   const isTerminal = ['success', 'failed', 'cancelled'].includes(run.status)
 
-  useEffect(() => {
-    if (!menuOpen) return
-    function onDocClick(e) {
-      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false)
-    }
-    document.addEventListener('mousedown', onDocClick)
-    return () => document.removeEventListener('mousedown', onDocClick)
-  }, [menuOpen])
-
   async function quickAction(action) {
-    setMenuOpen(false)
     try {
       if (action === 'cancel') await api.cancelRun(run.id)
       else if (action === 'rerun') {
@@ -193,20 +182,30 @@ function RunRow({ run, name, onOpen }) {
       </span>
       {run.branch && <span className="branch-pill">{run.branch}</span>}
       <span className="run-row__duration">{duration(run)}</span>
-      <div className="run-row__overflow" ref={menuRef} onClick={(e) => e.stopPropagation()}>
-        <button className="run-row__overflow-btn" onClick={() => setMenuOpen(!menuOpen)} title="More actions">
-          ⋯
-        </button>
-        {menuOpen && (
-          <div className="run-row__overflow-menu">
-            <button onClick={() => { setMenuOpen(false); onOpen() }}>View details</button>
-            {isTerminal ? (
-              <button onClick={() => quickAction('rerun')}>Re-run</button>
-            ) : (
-              <button onClick={() => quickAction('cancel')}>Cancel</button>
-            )}
-          </div>
-        )}
+      <div className="run-row__overflow" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger asChild>
+            <button className="run-row__overflow-btn" title="More actions">
+              ⋯
+            </button>
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content className="run-row__overflow-menu" align="end" sideOffset={4}>
+              <DropdownMenu.Item asChild>
+                <button onClick={onOpen}>View details</button>
+              </DropdownMenu.Item>
+              {isTerminal ? (
+                <DropdownMenu.Item asChild>
+                  <button onClick={() => quickAction('rerun')}>Re-run</button>
+                </DropdownMenu.Item>
+              ) : (
+                <DropdownMenu.Item asChild>
+                  <button onClick={() => quickAction('cancel')}>Cancel</button>
+                </DropdownMenu.Item>
+              )}
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
       </div>
     </div>
   )

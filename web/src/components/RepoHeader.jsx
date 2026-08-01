@@ -1,8 +1,33 @@
 import { useEffect, useState } from 'react'
-import { Package, GitBranch, Container, Terminal, Pencil } from 'lucide-react'
+import { Package, GitBranch, Container, Terminal, Pencil, Sun, Moon } from 'lucide-react'
 
 const RECENT_KEY = 'recentRepoPaths'
+const THEME_KEY = 'theme'
 const MAX_RECENT = 8
+
+function systemPrefersLight() {
+  return window.matchMedia?.('(prefers-color-scheme: light)').matches
+}
+
+// ponytail: two-state toggle (light/dark), no explicit "system" option in
+// the UI — first click always pins an explicit choice. Good enough; add a
+// three-way switch only if someone actually asks to get back to "follow OS".
+function useTheme() {
+  const [theme, setTheme] = useState(() => localStorage.getItem(THEME_KEY))
+
+  useEffect(() => {
+    if (theme) {
+      document.documentElement.dataset.theme = theme
+      localStorage.setItem(THEME_KEY, theme)
+    } else {
+      delete document.documentElement.dataset.theme
+    }
+  }, [theme])
+
+  const effective = theme || (systemPrefersLight() ? 'light' : 'dark')
+  const toggle = () => setTheme(effective === 'light' ? 'dark' : 'light')
+  return [effective, toggle]
+}
 
 function rememberPath(path) {
   if (!path) return
@@ -36,7 +61,9 @@ export default function RepoHeader({ repoPath, onCommit, health, onRecheck, bran
   const [editing, setEditing] = useState(!repoPath)
   const [draft, setDraft] = useState(repoPath)
   const [focused, setFocused] = useState(false)
+  const [theme, toggleTheme] = useTheme()
   const recentPaths = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]')
+  const ThemeIcon = theme === 'light' ? Sun : Moon
 
   useEffect(() => {
     setDraft(repoPath)
@@ -102,6 +129,13 @@ export default function RepoHeader({ repoPath, onCommit, health, onRecheck, bran
         ))}
       </datalist>
       <div className="health">
+        <button
+          className="health__item"
+          onClick={toggleTheme}
+          title={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
+        >
+          <ThemeIcon size={13} />
+        </button>
         <HealthItem icon={Container} label="Docker" ok={health?.dockerOK} error={health?.dockerError} onClick={onRecheck} />
         <HealthItem icon={Terminal} label="Act" ok={health?.actOK} onClick={onRecheck} />
       </div>

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
+import * as Popover from '@radix-ui/react-popover'
 import { api } from '../api.js'
 
 export default function RunWorkflowMenu({ repoPath, workflow, onStarted, onOpenSecrets }) {
@@ -10,16 +11,6 @@ export default function RunWorkflowMenu({ repoPath, workflow, onStarted, onOpenS
   const [starting, setStarting] = useState(false)
   const [payload, setPayload] = useState('')
   const [payloadError, setPayloadError] = useState(null)
-  const ref = useRef(null)
-
-  useEffect(() => {
-    if (!open) return
-    function onDocClick(e) {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', onDocClick)
-    return () => document.removeEventListener('mousedown', onDocClick)
-  }, [open])
 
   useEffect(() => {
     if (!open) return
@@ -92,12 +83,12 @@ export default function RunWorkflowMenu({ repoPath, workflow, onStarted, onOpenS
   const dispatchInputs = event === 'workflow_dispatch' ? workflow.dispatchInputs || [] : []
 
   return (
-    <div className="run-menu" ref={ref}>
-      <button className="btn btn--primary" onClick={() => setOpen(!open)}>
-        Run workflow ▾
-      </button>
-      {open && (
-        <div className="run-menu__panel">
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger asChild>
+        <button className="btn btn--primary">Run workflow ▾</button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content className="run-menu__panel" align="end" sideOffset={6}>
           <label className="field">
             <span>Event</span>
             <select value={event} onChange={(e) => setEvent(e.target.value)}>
@@ -175,8 +166,8 @@ export default function RunWorkflowMenu({ repoPath, workflow, onStarted, onOpenS
           <button className="btn btn--primary btn--block" onClick={run} disabled={!event || starting}>
             {starting ? 'Starting…' : 'Run workflow'}
           </button>
-        </div>
-      )}
-    </div>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   )
 }
