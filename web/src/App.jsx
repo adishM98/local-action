@@ -110,10 +110,12 @@ export default function App() {
 
   return (
     <div className="app">
-      <RepoHeader repoPath={repoPath} onCommit={commitRepoPath} health={health} onRecheck={checkHealth} branch={branch} />
+      <RepoHeader health={health} onRecheck={checkHealth} />
       <div className="shell">
         <Sidebar
           repoPath={repoPath}
+          onCommit={commitRepoPath}
+          branch={branch}
           workflows={workflows}
           scanState={scanState}
           view={view}

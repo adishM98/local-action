@@ -13,6 +13,9 @@ import {
   MoreHorizontal,
   PanelLeftClose,
   PanelLeftOpen,
+  Package,
+  GitBranch,
+  Pencil,
 } from 'lucide-react'
 import { StatusCircle } from './StatusIcon.jsx'
 import { lastRunByWorkflow, relativeTime } from '../format.js'
@@ -43,6 +46,19 @@ function displayCategory(category) {
 const MIN_WIDTH = 220
 const MAX_WIDTH = 520
 const DEFAULT_WIDTH = 300
+const RECENT_KEY = 'recentRepoPaths'
+const MAX_RECENT = 8
+
+function rememberPath(path) {
+  if (!path) return
+  const existing = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]')
+  const next = [path, ...existing.filter((p) => p !== path)].slice(0, MAX_RECENT)
+  localStorage.setItem(RECENT_KEY, JSON.stringify(next))
+}
+
+function repoNameFor(path) {
+  return path ? path.split('/').filter(Boolean).pop() || path : ''
+}
 
 function groupByCategory(workflows) {
   const groups = new Map()
@@ -54,7 +70,7 @@ function groupByCategory(workflows) {
   return CATEGORY_ORDER.filter((c) => groups.has(c)).map((c) => [c, groups.get(c)])
 }
 
-export default function Sidebar({ repoPath, workflows, scanState, view, onNavigate, runs }) {
+export default function Sidebar({ repoPath, onCommit, branch, workflows, scanState, view, onNavigate, runs }) {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [filtersOpen, setFiltersOpen] = useState(false)
@@ -62,8 +78,25 @@ export default function Sidebar({ repoPath, workflows, scanState, view, onNaviga
   const [, forceUpdate] = useState(0)
   const [width, setWidth] = useState(() => Number(localStorage.getItem('sidebarWidth')) || DEFAULT_WIDTH)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true')
+  const [editing, setEditing] = useState(!repoPath)
+  const [draft, setDraft] = useState(repoPath)
   const searchRef = useRef(null)
   const resizingRef = useRef(false)
+  const recentPaths = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]')
+
+  useEffect(() => {
+    setDraft(repoPath)
+    setEditing(!repoPath)
+  }, [repoPath])
+
+  function commitPath() {
+    const path = draft.trim()
+    setEditing(false)
+    if (path && path !== repoPath) {
+      rememberPath(path)
+      onCommit(path)
+    }
+  }
 
   useEffect(() => {
     localStorage.setItem('sidebarCollapsed', String(sidebarCollapsed))
@@ -184,9 +217,57 @@ export default function Sidebar({ repoPath, workflows, scanState, view, onNaviga
     <nav className="sidebar" style={{ width }}>
       <div className="sidebar__resize-handle" onMouseDown={startResize} title="Drag to resize" />
       <div className="sidebar__fixed">
-        <button className="sidebar__collapse-btn" onClick={() => setSidebarCollapsed(true)} title="Collapse sidebar">
-          <PanelLeftClose size={15} />
-        </button>
+        <div className="sidebar__repo">
+          <div className="repo-header__identity">
+            <span className="repo-header__icon">
+              <Package size={18} />
+            </span>
+            {editing ? (
+              <div className="repo-header__path-wrap">
+                <input
+                  className="repo-header__path-input"
+                  list="recent-repo-paths"
+                  autoFocus={!!repoPath}
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onBlur={commitPath}
+                  onKeyDown={(e) => e.key === 'Enter' && commitPath()}
+                  placeholder="/path/to/repo"
+                  spellCheck={false}
+                />
+              </div>
+            ) : (
+              <div className="repo-header__text">
+                <span className="repo-header__name">{repoNameFor(repoPath)}</span>
+                <button
+                  className="repo-header__meta"
+                  onClick={() => setEditing(true)}
+                  title={`${repoPath} — click to change`}
+                >
+                  {branch ? (
+                    <>
+                      <span className="repo-header__meta-icon">
+                        <GitBranch size={14} strokeWidth={2.25} />
+                      </span>
+                      {branch}
+                    </>
+                  ) : (
+                    <span className="repo-header__meta-path">{repoPath}</span>
+                  )}
+                  <Pencil size={11} className="repo-header__meta-edit" />
+                </button>
+              </div>
+            )}
+          </div>
+          <datalist id="recent-repo-paths">
+            {recentPaths.map((p) => (
+              <option key={p} value={p} />
+            ))}
+          </datalist>
+          <button className="sidebar__collapse-btn" onClick={() => setSidebarCollapsed(true)} title="Collapse sidebar">
+            <PanelLeftClose size={15} />
+          </button>
+        </div>
         <button
           className={`sidebar__item sidebar__item--flat sidebar__item--nav${view.name === 'overview' ? ' active' : ''}`}
           onClick={() => onNavigate({ name: 'overview' })}

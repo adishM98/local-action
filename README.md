@@ -1,4 +1,6 @@
-# local-action
+<p align="center">
+  <img src="docs/logo-with-text.png" alt="local-action — run GitHub Actions locally" width="360">
+</p>
 
 Selfhosted web UI for running GitHub Actions workflows locally, via Docker — wraps [`act`](https://github.com/nektos/act) so you get a browser UI (secrets, env/vars, run history, live logs) instead of memorizing CLI flags.
 
@@ -13,6 +15,14 @@ Single user, no auth, no accounts. Meant to run on your own machine or a home se
 
 ## Quick start
 
+Don't have Go/Node/`act` installed? Run the bootstrap script first — installs whatever's missing (via Homebrew on macOS, `apt`/act's official installer on Linux), checks Docker is running, and stops with a link if it hits something it can't safely automate:
+
+```bash
+make bootstrap
+```
+
+Then:
+
 ```bash
 make run
 ```
@@ -23,6 +33,7 @@ Other targets:
 
 | Command | Does |
 |---|---|
+| `make bootstrap` | Install missing build dependencies (Go, Node, act); checks Docker |
 | `make build` | Build frontend + binary, don't run |
 | `make dev` | Backend (`go run .`) + frontend dev server (hot reload) together, Ctrl-C stops both |
 | `make test` | `go test ./...` + frontend unit tests (`npm test`) |

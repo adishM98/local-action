@@ -1,7 +1,10 @@
 WEB_DIR := web
 WEB_SRC := $(shell find $(WEB_DIR)/src -type f) $(WEB_DIR)/package.json $(WEB_DIR)/vite.config.js $(WEB_DIR)/index.html
 
-.PHONY: build run dev test lint fmt install db-reset clean
+.PHONY: bootstrap build run dev test lint fmt install db-reset clean
+
+bootstrap:
+	./scripts/bootstrap.sh
 
 build: $(WEB_DIR)/dist/index.html
 	go build -o local-action ./cmd/local-action
