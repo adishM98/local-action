@@ -123,8 +123,24 @@ export default function RunDetail({ runId, onClose, onOpenRun }) {
         <X size={14} />
       </button>
       <div className="run-detail__head">
-        <StatusBadge status={run?.status} />
-        <h2>{run ? `${run.workflowFile} #${run.id}` : `Run #${runId}`}</h2>
+        <div className="run-detail__head-row">
+          <StatusBadge status={run?.status} />
+          <h2 title={run ? `${run.workflowFile} #${run.id}` : `Run #${runId}`}>
+            {run ? `${run.workflowFile} #${run.id}` : `Run #${runId}`}
+          </h2>
+          <div className="run-detail__actions">
+            {run && !isTerminal && (
+              <button className="btn" onClick={cancel} disabled={busy}>
+                Cancel
+              </button>
+            )}
+            {isTerminal && (
+              <button className="btn" onClick={rerun} disabled={busy}>
+                Re-run
+              </button>
+            )}
+          </div>
+        </div>
         {run && (
           <span className="run-detail__meta">
             {run.event}
@@ -133,18 +149,6 @@ export default function RunDetail({ runId, onClose, onOpenRun }) {
             {duration(run) && ` · ${duration(run)}`}
           </span>
         )}
-        <div className="run-detail__actions">
-          {run && !isTerminal && (
-            <button className="btn" onClick={cancel} disabled={busy}>
-              Cancel
-            </button>
-          )}
-          {isTerminal && (
-            <button className="btn" onClick={rerun} disabled={busy}>
-              Re-run
-            </button>
-          )}
-        </div>
       </div>
       {wsDown && run && !isTerminal && (
         <div className="banner banner--warn">

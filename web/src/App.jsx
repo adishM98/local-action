@@ -110,7 +110,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <RepoHeader health={health} onRecheck={checkHealth} />
+      <RepoHeader health={health} onRecheck={checkHealth} onNavigate={setView} />
       <div className="shell">
         <Sidebar
           repoPath={repoPath}

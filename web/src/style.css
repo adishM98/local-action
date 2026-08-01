@@ -88,21 +88,47 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 .app { display: flex; flex-direction: column; height: 100vh; }
 
 /* ── Repository header ───────────────────────────────── */
-.repo-header__brand { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
-.repo-header__brand-logo { width: 44px; height: 44px; border-radius: 8px; flex-shrink: 0; }
-.repo-header__brand-name { font-weight: 700; font-size: 17px; letter-spacing: -0.01em; color: var(--text); }
+/* Clickable — always returns to Overview, like every dev tool's logo does.
+   Reset from a bare <button>: no border/background of its own, host still
+   supplies the visible affordance via :hover. */
+.repo-header__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+/* Nudged up 2px — Inter's glyphs sit slightly high inside their own
+   line-box, so a geometrically-centered icon reads as sitting a hair low
+   next to geometrically-centered text unless corrected. */
+.repo-header__brand-logo { width: 48px; height: 48px; border-radius: 7px; flex-shrink: 0; position: relative; top: -2px; }
+.repo-header__brand-text { display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+.repo-header__brand-name {
+  display: block;
+  line-height: 1;
+  font-weight: 600;
+  font-size: 24px;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
 .repo-header__brand-accent {
   background: linear-gradient(90deg, #6d8dfb, #8b5cf6);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
+.repo-header__brand-tagline { font-size: 11px; color: var(--muted); margin-top: 2px; }
 
 .repo-header {
   display: flex;
   align-items: center;
   gap: 20px;
-  padding: 12px 16px;
+  padding: 12px 24px;
   background: var(--panel);
   border-bottom: 1px solid var(--border);
 }
@@ -182,6 +208,9 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   white-space: nowrap;
 }
 .health__item:hover { border-color: var(--border); }
+.health__item--ok { background: rgba(63, 185, 80, 0.12); color: var(--green); }
+.health__item--bad { background: rgba(248, 81, 73, 0.12); color: var(--red); }
+.health__item--pending { background: rgba(210, 153, 34, 0.12); color: var(--yellow); }
 
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
 .dot--ok { background: var(--green); }
@@ -580,6 +609,8 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   color: var(--text);
 }
 .run-row__overflow-menu button:hover { background: var(--panel); }
+.run-row__overflow-menu button.theme-menu__item { display: flex; align-items: center; gap: 8px; }
+.theme-menu__label { flex: 1; }
 
 /* ── Branch pill ─────────────────────────────────────── */
 /* Grayscale by design — color is reserved for workflow state, so a branch
@@ -677,6 +708,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 }
 .linklike:hover { text-decoration-color: var(--text); }
 .linklike:focus-visible { outline-offset: 3px; }
+.field__reset { float: right; font-size: 12px; font-weight: 500; }
 
 .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; font-size: 13px; }
 .field > span { font-weight: 600; }
@@ -771,13 +803,13 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 .drawer__close:hover { color: var(--text); border-color: var(--muted); }
 
 /* ── Run detail ──────────────────────────────────────── */
-.run-detail__head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 10px 36px 16px 0;
-}
-.run-detail__meta { color: var(--muted); font-size: 13px; flex: 1; }
+/* Title row and meta row are separate lines — cramming badge/title/meta/
+   actions onto one row squeezed the meta text into an awkward 2-line wrap
+   whenever the title (a full workflow path) was long. */
+.run-detail__head { display: flex; flex-direction: column; gap: 6px; margin: 10px 36px 16px 0; }
+.run-detail__head-row { display: flex; align-items: center; gap: 10px; }
+.run-detail__head-row h2 { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.run-detail__meta { color: var(--muted); font-size: 13px; }
 .run-detail__actions { display: flex; gap: 8px; flex-shrink: 0; }
 
 .job-card {

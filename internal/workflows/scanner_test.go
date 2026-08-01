@@ -353,6 +353,38 @@ jobs:
 	}
 }
 
+// TestParseWorkflowFile_SuggestsAllLabelsAcrossClausesAndJobs guards against
+// two ways a multi-label workflow could silently lose labels: multiple
+// contains() checks ||-joined within one job's condition, and different
+// jobs gating on different labels — both must all end up in one array.
+func TestParseWorkflowFile_SuggestsAllLabelsAcrossClausesAndJobs(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", `name: CI
+on: pull_request_target
+jobs:
+  build:
+    if: |
+      contains(github.event.pull_request.labels.*.name, 'run-cypress') ||
+      contains(github.event.pull_request.labels.*.name, 'run-cypress-ce')
+    runs-on: ubuntu-latest
+    steps: []
+  deploy:
+    if: |
+      contains(github.event.pull_request.labels.*.name, 'run-cypress-ce-deployments') ||
+      contains(github.event.pull_request.labels.*.name, 'run-cypress-ee-deployments')
+    runs-on: ubuntu-latest
+    steps: []
+`)
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	wantSuggested := `{"pull_request":{"labels":[{"name":"run-cypress"},{"name":"run-cypress-ce"},{"name":"run-cypress-ce-deployments"},{"name":"run-cypress-ee-deployments"}]}}`
+	if workflows[0].SuggestedEventPayload != wantSuggested {
+		t.Errorf("SuggestedEventPayload: got %q, want %q", workflows[0].SuggestedEventPayload, wantSuggested)
+	}
+}
+
 // TestParseWorkflowFile_NoSuggestionWhenNothingRecognizable guards against
 // suggestEventPayload fabricating a guess when the condition doesn't
 // contain any pattern it understands (e.g. a function call it doesn't

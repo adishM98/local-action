@@ -135,7 +135,21 @@ export default function RunWorkflowMenu({ repoPath, workflow, onStarted, onOpenS
           ))}
           {needsManualPayload && (
             <label className="field">
-              <span>Event payload (JSON)</span>
+              <span>
+                Event payload (JSON)
+                {suggested && payload !== suggested && (
+                  <button
+                    type="button"
+                    className="linklike field__reset"
+                    onClick={() => {
+                      setPayload(suggested)
+                      setPayloadError(null)
+                    }}
+                  >
+                    Reset to suggestion
+                  </button>
+                )}
+              </span>
               <textarea
                 className="event-payload-input"
                 rows={4}

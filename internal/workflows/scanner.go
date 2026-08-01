@@ -254,16 +254,18 @@ var (
 // that fully solves (see solveIfCondition), and returns its JSON payload
 // (act's -e/--eventpath shape) so the condition evaluates true without the
 // user hand-writing it. If nothing fully solves but some condition still
-// references github.event.*, suggested is a best-effort guess built from
-// whichever individual clauses ARE recognizable — a starting point for
-// manual entry, not a guarantee, since it ignores how clauses combine
-// (&&/||) and merges every match it finds. needsPayload is true whenever a
-// condition references github.event.* at all, solved or not — that's what
-// tells the frontend a payload is actually load-bearing for this workflow.
+// references github.event.*, suggested merges the recognizable clauses from
+// EVERY job's condition (not just the first) into one best-effort payload —
+// a workflow's jobs often gate on different label sets (e.g. a build job on
+// "run-cypress-ce", a deploy job on "run-cypress-ce-deployments"), so only
+// looking at the first job silently dropped the rest. needsPayload is true
+// whenever a condition references github.event.* at all, solved or not.
 func autoEventPayloadFromJobs(jobsNode *yaml.Node) (payload, suggested string, needsPayload bool) {
 	if jobsNode.Kind != yaml.MappingNode {
 		return "", "", false
 	}
+	root := map[string]any{}
+	found := false
 	for i := 0; i < len(jobsNode.Content); i += 2 {
 		jobNode := jobsNode.Content[i+1]
 		if jobNode.Kind != yaml.MappingNode {
@@ -280,13 +282,23 @@ func autoEventPayloadFromJobs(jobsNode *yaml.Node) (payload, suggested string, n
 			if !githubEventRe.MatchString(ifValue.Value) {
 				continue
 			}
-			if solved, ok := solveIfCondition(ifValue.Value); ok {
-				return solved, "", true
+			if payload == "" {
+				if solved, ok := solveIfCondition(ifValue.Value); ok {
+					payload = solved
+				}
 			}
 			needsPayload = true
-			if suggested == "" {
-				suggested = suggestEventPayload(ifValue.Value)
+			if mergeEventPayloadClauses(root, ifValue.Value) {
+				found = true
 			}
+		}
+	}
+	if payload != "" {
+		return payload, "", true
+	}
+	if found {
+		if b, err := json.Marshal(root); err == nil {
+			suggested = string(b)
 		}
 	}
 	return "", suggested, needsPayload
@@ -323,17 +335,21 @@ func solveIfCondition(cond string) (string, bool) {
 	return string(b), true
 }
 
-// suggestEventPayload scans cond for every recognizable clause regardless
-// of how they're joined (&&, ||, or anything else) and merges them into
-// one best-effort payload. Unlike solveIfCondition this never fails outright
-// — it returns "" only when nothing recognizable was found at all.
-func suggestEventPayload(cond string) string {
+// mergeEventPayloadClauses scans cond for every recognizable clause
+// regardless of how they're joined (&&, ||, or anything else) and merges
+// them into root, accumulating rather than overwriting — a single condition
+// commonly ||-checks several labels (contains(..., 'a') || contains(...,
+// 'b')), and a workflow commonly has several jobs each gating on a
+// different label, so root is shared across every call for the whole
+// workflow and every recognized label ends up present at once. Unlike
+// solveIfCondition this never fails outright; it returns false only when
+// nothing recognizable was found in cond.
+func mergeEventPayloadClauses(root map[string]any, cond string) bool {
 	cond = strings.TrimSpace(cond)
 	cond = strings.TrimPrefix(cond, "${{")
 	cond = strings.TrimSuffix(cond, "}}")
 	cond = strings.TrimSpace(cond)
 
-	root := map[string]any{}
 	found := false
 	for _, m := range ifClauseRe.FindAllStringSubmatch(cond, -1) {
 		value := m[2]
@@ -348,25 +364,18 @@ func suggestEventPayload(cond string) string {
 		if value == "" && m[4] != "" {
 			value = m[4]
 		}
-		setNestedArrayLeaf(root, m[1], m[2], value)
+		appendNestedArrayLeaf(root, m[1], m[2], value)
 		found = true
 	}
-	if !found {
-		return ""
-	}
-	b, err := json.Marshal(root)
-	if err != nil {
-		return ""
-	}
-	return string(b)
+	return found
 }
 
 // applyClause matches a single clause against every recognized pattern and
 // applies the first match to root. anchored requires the clause to consist
 // of nothing but the matched pattern (used by solveIfCondition, where a
 // clause with trailing junk isn't actually fully understood); the
-// permissive scan in suggestEventPayload doesn't call this at all since it
-// wants every match anywhere, anchored or not.
+// permissive scan in mergeEventPayloadClauses doesn't call this at all since
+// it wants every match anywhere, anchored or not.
 func applyClause(root map[string]any, clause string, anchored bool) bool {
 	if m := ifClauseRe.FindStringSubmatch(clause); m != nil && (!anchored || m[0] == clause) {
 		value := m[2]
@@ -381,7 +390,7 @@ func applyClause(root map[string]any, clause string, anchored bool) bool {
 		if value == "" && m[4] != "" {
 			value = m[4]
 		}
-		setNestedArrayLeaf(root, m[1], m[2], value)
+		appendNestedArrayLeaf(root, m[1], m[2], value)
 		return true
 	}
 	return false
@@ -400,12 +409,15 @@ func setNestedPath(root map[string]any, path []string, value string) {
 	node[path[len(path)-1]] = value
 }
 
-// setNestedArrayLeaf handles the contains(...*.leaf...) shape: basePath's
+// appendNestedArrayLeaf handles the contains(...*.leaf...) shape: basePath's
 // last segment is the array field itself (e.g. "pull_request.labels" ->
-// object nesting "pull_request", then an array field "labels"), set to a
-// one-element array carrying leaf: value — just enough for act's `.*.`
-// glob-and-flatten to produce [value], which contains() then matches.
-func setNestedArrayLeaf(root map[string]any, basePath, leaf, value string) {
+// object nesting "pull_request", then an array field "labels"). It appends
+// {leaf: value} to that array rather than replacing it, since a workflow
+// commonly checks several distinct label values across ||-joined clauses or
+// separate jobs (run-cypress, run-cypress-ce, run-cypress-ce-deployments,
+// ...) — a single-element array would silently drop every label but the
+// last one seen, which acts `.*.` glob-and-flatten then can't match against.
+func appendNestedArrayLeaf(root map[string]any, basePath, leaf, value string) {
 	segments := strings.Split(basePath, ".")
 	arrayField := segments[len(segments)-1]
 	node := root
@@ -417,7 +429,13 @@ func setNestedArrayLeaf(root map[string]any, basePath, leaf, value string) {
 		}
 		node = next
 	}
-	node[arrayField] = []any{map[string]any{leaf: value}}
+	existing, _ := node[arrayField].([]any)
+	for _, e := range existing {
+		if m, ok := e.(map[string]any); ok && m[leaf] == value {
+			return
+		}
+	}
+	node[arrayField] = append(existing, map[string]any{leaf: value})
 }
 
 var incompatibleRunnerRe = regexp.MustCompile(`(?i)^(windows|macos|self-hosted)`)
