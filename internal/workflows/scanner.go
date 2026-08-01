@@ -34,8 +34,15 @@ type WorkflowInfo struct {
 	// clauses it found regardless of &&/||, so the user still needs to
 	// check it.
 	SuggestedEventPayload string `json:"suggestedEventPayload,omitempty"`
-	AutoCategory          string `json:"autoCategory"`
-	ParseError            string `json:"parseError,omitempty"`
+	// IncompatibleRunners lists any runs-on labels (deduped, sorted) that
+	// act cannot actually honor: act only ever runs Linux containers, so
+	// windows-*/macos-*/self-hosted labels silently either fail or fall
+	// back to a Linux image that doesn't match what the label claims.
+	// Matrix-templated runs-on (e.g. ${{ matrix.os }}) can't be resolved
+	// statically and is skipped rather than guessed at.
+	IncompatibleRunners []string `json:"incompatibleRunners,omitempty"`
+	AutoCategory        string   `json:"autoCategory"`
+	ParseError          string   `json:"parseError,omitempty"`
 }
 
 // categoryKeywords is checked in order — more specific categories (Security)
@@ -188,6 +195,7 @@ func ParseWorkflowFile(path string) (WorkflowInfo, error) {
 
 	if jobsNode != nil {
 		info.AutoEventPayload, info.SuggestedEventPayload, info.NeedsEventPayload = autoEventPayloadFromJobs(jobsNode)
+		info.IncompatibleRunners = incompatibleRunners(jobsNode)
 	}
 
 	if onNode == nil {
@@ -410,6 +418,66 @@ func setNestedArrayLeaf(root map[string]any, basePath, leaf, value string) {
 		node = next
 	}
 	node[arrayField] = []any{map[string]any{leaf: value}}
+}
+
+var incompatibleRunnerRe = regexp.MustCompile(`(?i)^(windows|macos|self-hosted)`)
+
+// incompatibleRunners scans every job's runs-on for labels act can't
+// actually honor, deduped and sorted.
+func incompatibleRunners(jobsNode *yaml.Node) []string {
+	if jobsNode.Kind != yaml.MappingNode {
+		return nil
+	}
+	seen := map[string]bool{}
+	var found []string
+	for i := 0; i < len(jobsNode.Content); i += 2 {
+		jobNode := jobsNode.Content[i+1]
+		if jobNode.Kind != yaml.MappingNode {
+			continue
+		}
+		for j := 0; j < len(jobNode.Content); j += 2 {
+			if jobNode.Content[j].Value != "runs-on" {
+				continue
+			}
+			for _, label := range runsOnLabels(jobNode.Content[j+1]) {
+				if incompatibleRunnerRe.MatchString(label) && !seen[label] {
+					seen[label] = true
+					found = append(found, label)
+				}
+			}
+		}
+	}
+	sort.Strings(found)
+	return found
+}
+
+// runsOnLabels normalizes every runs-on shape (scalar, list, or the
+// {group, labels} map form) into a flat label list. A matrix-templated
+// value (contains ${{) is skipped — it can't be resolved without
+// expanding the matrix, and act does that expansion itself at run time.
+func runsOnLabels(n *yaml.Node) []string {
+	switch n.Kind {
+	case yaml.ScalarNode:
+		if strings.Contains(n.Value, "${{") {
+			return nil
+		}
+		return []string{n.Value}
+	case yaml.SequenceNode:
+		var labels []string
+		for _, item := range n.Content {
+			if item.Kind == yaml.ScalarNode && !strings.Contains(item.Value, "${{") {
+				labels = append(labels, item.Value)
+			}
+		}
+		return labels
+	case yaml.MappingNode:
+		for i := 0; i < len(n.Content); i += 2 {
+			if n.Content[i].Value == "labels" {
+				return runsOnLabels(n.Content[i+1])
+			}
+		}
+	}
+	return nil
 }
 
 func parseDispatchInputs(n *yaml.Node) []DispatchInput {

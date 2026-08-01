@@ -57,6 +57,12 @@ export default function RunsView({ repoPath, workflows, workflowFile, health, ru
         )}
       </div>
       {workflow?.parseError && <p className="error">{workflow.parseError}</p>}
+      {workflow?.incompatibleRunners?.length > 0 && (
+        <div className="banner banner--warn">
+          Runs on <code>{workflow.incompatibleRunners.join(', ')}</code> — act only emulates Linux runners locally, so
+          this may fail or behave differently than real CI.
+        </div>
+      )}
       {health && health.dockerOK === false && (
         <div className="banner banner--warn">Docker is not running — workflow runs will fail.</div>
       )}

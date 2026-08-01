@@ -116,6 +116,13 @@ export default function RunWorkflowMenu({ repoPath, workflow, onStarted, onOpenS
                     </option>
                   ))}
                 </select>
+              ) : input.type === 'boolean' ? (
+                <input
+                  type="checkbox"
+                  className="field__checkbox"
+                  checked={(inputs[input.name] ?? input.default) === 'true'}
+                  onChange={(e) => setInputs({ ...inputs, [input.name]: e.target.checked ? 'true' : 'false' })}
+                />
               ) : (
                 <input
                   placeholder={input.default}

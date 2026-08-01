@@ -415,6 +415,130 @@ func TestParseWorkflowFile_SetsAutoCategory(t *testing.T) {
 	}
 }
 
+func TestParseWorkflowFile_UbuntuRunnerNotFlagged(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", "name: CI\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps: []\n")
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	if len(workflows[0].IncompatibleRunners) != 0 {
+		t.Errorf("expected no incompatible runners, got %v", workflows[0].IncompatibleRunners)
+	}
+}
+
+func TestParseWorkflowFile_FlagsWindowsRunner(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", "name: CI\non: push\njobs:\n  build:\n    runs-on: windows-latest\n    steps: []\n")
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	want := []string{"windows-latest"}
+	if !reflect.DeepEqual(workflows[0].IncompatibleRunners, want) {
+		t.Errorf("got %v, want %v", workflows[0].IncompatibleRunners, want)
+	}
+}
+
+func TestParseWorkflowFile_FlagsMacosRunner(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", "name: CI\non: push\njobs:\n  build:\n    runs-on: macos-14\n    steps: []\n")
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	want := []string{"macos-14"}
+	if !reflect.DeepEqual(workflows[0].IncompatibleRunners, want) {
+		t.Errorf("got %v, want %v", workflows[0].IncompatibleRunners, want)
+	}
+}
+
+func TestParseWorkflowFile_FlagsSelfHostedLabelList(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", "name: CI\non: push\njobs:\n  build:\n    runs-on: [self-hosted, linux, x64]\n    steps: []\n")
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	want := []string{"self-hosted"}
+	if !reflect.DeepEqual(workflows[0].IncompatibleRunners, want) {
+		t.Errorf("got %v, want %v", workflows[0].IncompatibleRunners, want)
+	}
+}
+
+func TestParseWorkflowFile_FlagsGroupLabelsMapForm(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", `name: CI
+on: push
+jobs:
+  build:
+    runs-on:
+      group: my-group
+      labels: [self-hosted, windows]
+    steps: []
+`)
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	want := []string{"self-hosted", "windows"}
+	if !reflect.DeepEqual(workflows[0].IncompatibleRunners, want) {
+		t.Errorf("got %v, want %v", workflows[0].IncompatibleRunners, want)
+	}
+}
+
+// TestParseWorkflowFile_MatrixTemplatedRunnerSkipsStaticCheck guards against
+// false positives/negatives: a matrix-driven runs-on can't be resolved
+// without expanding the matrix (act's job, not ours), so it's simply
+// skipped rather than flagged or guessed at.
+func TestParseWorkflowFile_MatrixTemplatedRunnerSkipsStaticCheck(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", `name: CI
+on: push
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps: []
+`)
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	if len(workflows[0].IncompatibleRunners) != 0 {
+		t.Errorf("expected matrix-templated runs-on to be skipped, got %v", workflows[0].IncompatibleRunners)
+	}
+}
+
+// TestParseWorkflowFile_DedupesIncompatibleRunnersAcrossJobs guards the
+// dedup+sort behavior when multiple jobs share the same incompatible label.
+func TestParseWorkflowFile_DedupesIncompatibleRunnersAcrossJobs(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", `name: CI
+on: push
+jobs:
+  a:
+    runs-on: windows-latest
+    steps: []
+  b:
+    runs-on: windows-latest
+    steps: []
+  c:
+    runs-on: macos-latest
+    steps: []
+`)
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	want := []string{"macos-latest", "windows-latest"}
+	if !reflect.DeepEqual(workflows[0].IncompatibleRunners, want) {
+		t.Errorf("got %v, want %v", workflows[0].IncompatibleRunners, want)
+	}
+}
+
 func TestScanWorkflows_StringEvent(t *testing.T) {
 	repo := t.TempDir()
 	writeWorkflow(t, repo, "ci.yml", "name: CI\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps: []\n")
