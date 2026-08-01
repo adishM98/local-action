@@ -11,6 +11,7 @@ import (
 	"local-action/internal/runs"
 	"local-action/internal/secrets"
 	"local-action/internal/ws"
+	"local-action/web"
 )
 
 func main() {
@@ -39,7 +40,7 @@ func main() {
 
 	mux := httpapi.NewRouter(db, key, engine, hub, *actBin)
 
-	staticFS, err := fs.Sub(webDist, "web/dist")
+	staticFS, err := fs.Sub(web.Dist, "dist")
 	if err != nil {
 		log.Fatalf("load embedded UI: %v", err)
 	}

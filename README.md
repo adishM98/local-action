@@ -17,7 +17,7 @@ Single user, no auth, no accounts. Meant to run on your own machine or a home se
 make run
 ```
 
-Builds the frontend (first time only, or after `cmd/local-action/web/src` changes), builds the Go binary, and starts it. Open `http://localhost:8090`.
+Builds the frontend (first time only, or after `web/src` changes), builds the Go binary, and starts it. Open `http://localhost:8090`.
 
 Other targets:
 
@@ -47,41 +47,37 @@ Runs execute one at a time, FIFO — triggering a second run while one is in pro
 
 ## Building the frontend
 
-The UI is a Vite/React app under `cmd/local-action/web/`, built to static assets and embedded into the Go binary via `go:embed` (the frontend has to live alongside the binary's `main` package — `go:embed` can't reach outside its own directory tree). `make build`/`make run` handle this automatically (only rebuilds when `web/src` actually changed). To do it by hand instead:
+The UI is a Vite/React app at top-level `web/`, built to static assets and embedded into the Go binary via `go:embed` (declared in `web/embed.go` — `go:embed` can't reach outside the directory tree of the file that declares it, so the embed lives inside `web/` itself, and `cmd/local-action` imports the resulting `web.Dist` as an ordinary package). `make build`/`make run` handle this automatically (only rebuilds when `web/src` actually changed). To do it by hand instead:
 
 ```bash
-cd cmd/local-action/web
+cd web
 npm install   # first time only
 npm run build
-cd ../../..
+cd ..
 go build -o local-action ./cmd/local-action
 ```
 
 For frontend-only iteration with hot reload, use `make dev`, or by hand (backend must be running separately on `:8090`):
 
 ```bash
-cd cmd/local-action/web
+cd web
 npm run dev
 ```
 
 ## Project layout
 
 ```
-cmd/local-action/     entrypoint (main.go), go:embed wiring, and the web/ frontend
-  main.go             flags, wiring, HTTP server startup
-  embed.go            //go:embed all:web/dist
-  web/                Vite/React app (src/, dist/ built output, package.json)
-internal/app/         all backend logic — one package, imported by cmd/local-action
-  db.go               SQLite schema + OpenDB
-  crypto.go           encryption key management, AES-GCM
-  secrets.go          encrypted secrets/vars store
-  scanner.go          .github/workflows/*.yml parsing
-  runs.go             run history + log storage
-  actrunner*.go       act argv builder + invocation engine (FIFO queue)
-  ws.go               WebSocket log-streaming hub
-  api.go              HTTP route wiring
-testdata/sample-repo/  a real workflow file, for manual end-to-end testing
-docs/                  architecture notes, design spec, implementation plan
+cmd/local-action/      entrypoint: main.go (flags, wiring, HTTP server startup)
+web/                    Vite/React frontend (src/, dist/ built output, package.json, embed.go)
+internal/
+  db/                   SQLite schema + OpenDB
+  secrets/              encrypted secrets/vars store, AES-GCM
+  workflows/            .github/workflows/*.yml parsing, category overrides, saved event payloads
+  runs/                 run history/log storage, act invocation engine (FIFO queue)
+  ws/                   WebSocket log-streaming hub
+  httpapi/              HTTP route wiring
+testdata/sample-repo/   a real workflow file, for manual end-to-end testing
+docs/                   architecture notes, design spec, implementation plan
 ```
 
 ## Security
