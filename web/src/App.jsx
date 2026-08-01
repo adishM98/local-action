@@ -12,6 +12,7 @@ export default function App() {
   const [repoPath, setRepoPath] = useState(localStorage.getItem('repoPath') || '')
   const [workflows, setWorkflows] = useState([])
   const [scanState, setScanState] = useState({ scanned: false, error: null })
+  const [scanning, setScanning] = useState(false)
   const [view, setView] = useState({ name: 'overview' })
   const [health, setHealth] = useState(null)
   const [drawerRunId, setDrawerRunId] = useState(null)
@@ -42,6 +43,7 @@ export default function App() {
 
   const scan = useCallback(async (path) => {
     if (!path) return
+    setScanning(true)
     try {
       const result = await api.scan(path)
       setWorkflows(result || [])
@@ -49,6 +51,8 @@ export default function App() {
     } catch (err) {
       setWorkflows([])
       setScanState({ scanned: true, error: err.message })
+    } finally {
+      setScanning(false)
     }
   }, [])
 
@@ -118,6 +122,8 @@ export default function App() {
           branch={branch}
           workflows={workflows}
           scanState={scanState}
+          scanning={scanning}
+          onRescan={() => scan(repoPath)}
           view={view}
           onNavigate={setView}
           runs={runs}

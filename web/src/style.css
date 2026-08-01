@@ -284,6 +284,27 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 .sidebar__heading:first-child { margin-top: 0; }
 .sidebar__heading--link { cursor: pointer; transition: color 150ms ease; }
 .sidebar__heading--link:hover { color: var(--text); }
+.sidebar__heading-row { display: flex; align-items: center; }
+.sidebar__heading-row .sidebar__heading { margin-top: 0; flex: 1; }
+.sidebar__rescan-btn {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text);
+  cursor: pointer;
+  padding: 4px;
+  margin: 0 4px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+.sidebar__rescan-btn:hover:not(:disabled) { background: var(--blue); border-color: var(--blue); color: #fff; }
+.sidebar__rescan-btn:disabled { cursor: default; opacity: 0.6; }
+.sidebar__rescan-btn .spin { animation: sidebar-rescan-spin 800ms linear infinite; }
+@keyframes sidebar-rescan-spin {
+  to { transform: rotate(360deg); }
+}
 
 .sidebar__item {
   display: block;

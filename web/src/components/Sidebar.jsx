@@ -16,6 +16,7 @@ import {
   Package,
   GitBranch,
   Pencil,
+  RefreshCw,
 } from 'lucide-react'
 import { StatusCircle } from './StatusIcon.jsx'
 import { lastRunByWorkflow, relativeTime } from '../format.js'
@@ -70,7 +71,7 @@ function groupByCategory(workflows) {
   return CATEGORY_ORDER.filter((c) => groups.has(c)).map((c) => [c, groups.get(c)])
 }
 
-export default function Sidebar({ repoPath, onCommit, branch, workflows, scanState, view, onNavigate, runs }) {
+export default function Sidebar({ repoPath, onCommit, branch, workflows, scanState, scanning, onRescan, view, onNavigate, runs }) {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [filtersOpen, setFiltersOpen] = useState(false)
@@ -335,9 +336,19 @@ export default function Sidebar({ repoPath, onCommit, branch, workflows, scanSta
       </div>
 
       <div className="sidebar__scroll">
-        <button className="sidebar__heading sidebar__heading--link" onClick={() => onNavigate({ name: 'runs', workflowFile: null })}>
-          Workflow Explorer
-        </button>
+        <div className="sidebar__heading-row">
+          <button className="sidebar__heading sidebar__heading--link" onClick={() => onNavigate({ name: 'runs', workflowFile: null })}>
+            Workflow Explorer
+          </button>
+          <button
+            className="sidebar__rescan-btn"
+            onClick={onRescan}
+            disabled={scanning}
+            title="Rescan .github/workflows — pick up new/edited/removed workflow files"
+          >
+            <RefreshCw size={14} className={scanning ? 'spin' : ''} />
+          </button>
+        </div>
         {q && matching.length === 0 && <p className="sidebar__note">No workflows match "{search}".</p>}
         {groups.map(([category, items]) => {
           const Icon = CATEGORY_ICON[category] || MoreHorizontal
