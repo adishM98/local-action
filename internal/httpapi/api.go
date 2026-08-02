@@ -289,10 +289,8 @@ func NewRouter(db *sql.DB, key []byte, engine *runs.Engine, hub *ws.Hub, term *t
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if body.RepoPath == "" {
-			http.Error(w, "repoPath required", http.StatusBadRequest)
-			return
-		}
+		// repoPath may be empty (no repo selected yet) — Manager.Create
+		// falls back to the user's home directory in that case.
 		session, err := term.Create(body.RepoPath)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)

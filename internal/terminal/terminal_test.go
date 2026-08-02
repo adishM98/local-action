@@ -1,6 +1,7 @@
 package terminal
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -103,4 +104,20 @@ func TestSession_ShellRuns(t *testing.T) {
 
 	s.ptmx.Write([]byte("echo hello-terminal\r"))
 	waitForOutput(t, s, "hello-terminal")
+}
+
+func TestManager_CreateEmptyRepoPathDefaultsToHome(t *testing.T) {
+	m := NewManager()
+	s, err := m.Create("")
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	defer m.Kill(s.ID)
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("UserHomeDir: %v", err)
+	}
+	s.ptmx.Write([]byte("pwd\r"))
+	waitForOutput(t, s, home)
 }

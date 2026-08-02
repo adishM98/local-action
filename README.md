@@ -10,6 +10,10 @@ Selfhosted web UI for running GitHub Actions workflows locally, via Docker — w
 
 Single user, no auth, no accounts. Meant to run on your own machine or a home server, bound to `localhost` only.
 
+<p align="center">
+  <img src="docs/application.png" alt="local-action running as the DMG app — Overview page with the in-app terminal panel open" width="800">
+</p>
+
 ## Install
 
 ### macOS, DMG app (recommended — no terminal needed)

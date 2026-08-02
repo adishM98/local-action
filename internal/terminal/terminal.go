@@ -64,10 +64,18 @@ func shellPath() string {
 }
 
 // Create spawns a login shell rooted at repoPath and starts pumping its
-// output in the background.
+// output in the background. repoPath may be empty (no repo selected yet)
+// — the shell then starts in the user's home directory rather than an
+// unset cwd, which for a Finder-launched app would otherwise resolve to
+// somewhere unhelpful like "/".
 func (m *Manager) Create(repoPath string) (*Session, error) {
+	dir := repoPath
+	if dir == "" {
+		dir, _ = os.UserHomeDir()
+	}
+
 	cmd := exec.Command(shellPath(), "-l")
-	cmd.Dir = repoPath
+	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "TERM=xterm-256color")
 
 	ptmx, err := pty.Start(cmd)

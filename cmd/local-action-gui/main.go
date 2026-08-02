@@ -11,9 +11,9 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	webview "github.com/webview/webview_go"
 
@@ -37,6 +37,8 @@ func init() {
 }
 
 func main() {
+	fixPATH()
+
 	dataDir, err := appDataDir()
 	if err != nil {
 		log.Fatalf("resolve app data dir: %v", err)
@@ -58,6 +60,7 @@ func main() {
 
 	w := webview.New(false)
 	defer w.Destroy()
+	installEditMenu()
 	w.SetTitle("local-action")
 	w.SetSize(1280, 800, webview.HintNone)
 	w.Navigate("http://" + addr)
@@ -97,11 +100,10 @@ func startServer(dataDir string) bool {
 	}
 
 	hub := ws.NewHub()
-	actBin := resolveActBin()
-	engine := runs.NewEngine(database, key, actBin, hub.Broadcast, hub.Forget)
+	engine := runs.NewEngine(database, key, "act", hub.Broadcast, hub.Forget)
 	term := terminal.NewManager()
 
-	mux := httpapi.NewRouter(database, key, engine, hub, term, actBin)
+	mux := httpapi.NewRouter(database, key, engine, hub, term, "act")
 
 	staticFS, err := fs.Sub(web.Dist, "dist")
 	if err != nil {
@@ -116,18 +118,19 @@ func startServer(dataDir string) bool {
 	return true
 }
 
-// resolveActBin falls back to common Homebrew install locations. A
+// fixPATH prepends common Homebrew/Docker install locations to PATH. A
 // Finder-launched app gets a minimal PATH (no .zshrc/.bash_profile
-// sourced), so a Homebrew-installed act is often invisible to
-// exec.LookPath here even though it works fine from a Terminal-launched CLI.
-func resolveActBin() string {
-	if _, err := exec.LookPath("act"); err == nil {
-		return "act"
-	}
-	for _, candidate := range []string{"/opt/homebrew/bin/act", "/usr/local/bin/act"} {
-		if _, err := os.Stat(candidate); err == nil {
-			return candidate
+// sourced) that's missing wherever `act`, `docker`, etc. actually live —
+// they work fine from a Terminal-launched CLI but are invisible here
+// otherwise. Fixing PATH once, up front, covers every exec.Command call
+// in the process (act invocations, the Docker health check, git) instead
+// of resolving each binary's location separately.
+func fixPATH() {
+	path := os.Getenv("PATH")
+	for _, dir := range []string{"/opt/homebrew/bin", "/usr/local/bin"} {
+		if !strings.Contains(path, dir) {
+			path = dir + ":" + path
 		}
 	}
-	return "act"
+	os.Setenv("PATH", path)
 }

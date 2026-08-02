@@ -19,9 +19,10 @@ export default function TerminalPanel({ repoPath }) {
 
   // Restore whatever sessions are still alive for this repo — covers a page
   // refresh (the panel remounts, but the shells never stopped) and a repo
-  // switch (previous repo's tabs shouldn't show up here).
+  // switch (previous repo's tabs shouldn't show up here). repoPath can be
+  // "" (no repo selected yet) — that's still a valid, distinct scope.
   useEffect(() => {
-    if (!repoPath || restoredForRef.current === repoPath) return
+    if (restoredForRef.current === repoPath) return
     restoredForRef.current = repoPath
     setTabs([])
     setActiveId(null)
@@ -46,7 +47,6 @@ export default function TerminalPanel({ repoPath }) {
   }, [])
 
   async function newTab() {
-    if (!repoPath) return
     const { id } = await api.createTerminalSession(repoPath)
     setTabs((t) => [...t, id])
     setActiveId(id)
@@ -61,8 +61,6 @@ export default function TerminalPanel({ repoPath }) {
     })
     api.killTerminalSession(id).catch(() => {})
   }
-
-  if (!repoPath) return null
 
   return (
     <div className={`terminal-panel${open ? ' terminal-panel--open' : ''}`}>
