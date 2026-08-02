@@ -499,7 +499,12 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   justify-content: space-between;
   margin-bottom: 24px;
 }
-.runs-view__subtitle { color: var(--muted); font-size: 13px; margin: 10px 0 0; }
+.runs-view__subtitle { color: var(--muted); font-size: 13px; margin: 10px 0 0; display: flex; align-items: center; gap: 10px; }
+.runs-view__sync { display: inline-flex; align-items: center; gap: 4px; background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); font-size: 12px; cursor: pointer; padding: 3px 8px; border-radius: 6px; }
+.runs-view__sync:hover { color: var(--text); border-color: var(--muted); }
+.runs-view__sync:disabled { cursor: default; }
+.runs-view__sync--spinning svg { animation: spin 800ms linear infinite; }
+
 
 .recent-activity { margin-bottom: 24px; }
 .recent-activity__heading {
@@ -521,12 +526,6 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 
 .empty-state--rich { text-align: center; padding: 40px 20px; }
 .empty-state__heading { font-size: 16px; font-weight: 600; color: var(--text); margin: 0 0 6px; }
-
-.stat-cards {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 24px;
-}
 
 .pagination {
   display: flex;
@@ -564,33 +563,6 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   padding: 6px 10px;
   font-size: 13px;
 }
-/* Flat at rest, shadow only appears on hover — Vercel's cards don't
-   announce elevation until you actually interact with them. */
-.stat-card {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  padding: 22px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-left: 2px solid var(--border);
-  border-radius: 10px;
-  transition: transform 120ms ease, box-shadow 120ms ease;
-}
-.stat-card__value { font-size: 32px; font-weight: 700; letter-spacing: -0.02em; color: var(--text); }
-.stat-card__label {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 13px;
-  color: var(--muted);
-}
-.stat-card__sub { font-size: 12px; color: var(--muted); }
-.stat-card--passed { border-left-color: var(--green); }
-.stat-card--failed { border-left-color: var(--red); }
-.stat-card--running { border-left-color: var(--blue); }
-.stat-card:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); }
 
 .banner {
   border: 1px solid var(--border);
@@ -736,6 +708,9 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 
 /* ── Buttons / fields ────────────────────────────────── */
 .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   background: var(--panel-2);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -1174,3 +1149,24 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 /* ── Misc ────────────────────────────────────────────── */
 .error { color: var(--red); font-size: 13px; }
 .empty-state { color: var(--muted); padding: 24px 0; }
+
+/* ── Terminal panel ──────────────────────────────────── */
+.terminal-panel { flex-shrink: 0; border-top: 1px solid var(--border); background: var(--panel); display: flex; flex-direction: column; }
+.terminal-panel__bar { display: flex; align-items: center; gap: 4px; height: 34px; padding: 0 6px 0 0; }
+.terminal-panel__toggle { display: flex; align-items: center; gap: 6px; background: none; border: none; color: var(--muted); font-size: 12px; cursor: pointer; height: 100%; padding: 0 10px; }
+.terminal-panel__toggle:hover, .terminal-panel--open .terminal-panel__toggle { color: var(--text); }
+/* Closed: nothing else is in the bar yet, so the whole strip should react —
+   not just the tight box around the icon+label. */
+.terminal-panel:not(.terminal-panel--open) .terminal-panel__toggle { flex: 1; justify-content: flex-start; }
+.terminal-panel__tabs { display: flex; align-items: center; gap: 2px; flex: 1; overflow-x: auto; margin-left: 8px; }
+.terminal-panel__tab { display: flex; align-items: center; gap: 2px; padding: 3px 4px 3px 10px; border-radius: 6px; }
+.terminal-panel__tab--active { background: var(--panel-2); }
+.terminal-panel__tab-label { background: none; border: none; color: var(--muted); font-size: 12px; cursor: pointer; padding: 2px 4px; }
+.terminal-panel__tab--active .terminal-panel__tab-label { color: var(--text); }
+.terminal-panel__tab-close { display: flex; background: none; border: none; color: var(--faint); cursor: pointer; padding: 3px; border-radius: 4px; }
+.terminal-panel__tab-close:hover { background: var(--border); color: var(--text); }
+.terminal-panel__new, .terminal-panel__collapse { display: flex; background: none; border: none; color: var(--muted); cursor: pointer; padding: 5px 6px; border-radius: 6px; }
+.terminal-panel__new:hover, .terminal-panel__collapse:hover { color: var(--text); background: var(--panel-2); }
+.terminal-panel__body { height: 300px; padding: 8px 10px 10px; overflow: hidden; }
+.terminal-view { height: 100%; width: 100%; }
+.terminal-panel__empty { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--muted); font-size: 13px; }

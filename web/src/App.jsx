@@ -7,6 +7,7 @@ import RunsView from './components/RunsView.jsx'
 import RunDetail from './components/RunDetail.jsx'
 import SecretsPage from './components/SecretsPage.jsx'
 import Drawer from './components/Drawer.jsx'
+import TerminalPanel from './components/TerminalPanel.jsx'
 
 export default function App() {
   const [repoPath, setRepoPath] = useState(localStorage.getItem('repoPath') || '')
@@ -148,6 +149,8 @@ export default function App() {
               runsError={runsError}
               onOpenRun={setDrawerRunId}
               onOpenSecrets={(workflowFile) => setView({ name: 'secrets', workflowFile })}
+              onRescan={() => scan(repoPath)}
+              scanning={scanning}
             />
           )}
           {view.name === 'secrets' && (
@@ -164,6 +167,7 @@ export default function App() {
           <RunDetail runId={drawerRunId} onClose={() => setDrawerRunId(null)} onOpenRun={setDrawerRunId} />
         </Drawer>
       )}
+      <TerminalPanel repoPath={repoPath} />
     </div>
   )
 }

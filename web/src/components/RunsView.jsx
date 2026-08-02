@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { Search, Users, CheckCircle2, XCircle, Loader2, CircleSlash, Clock } from 'lucide-react'
+import { Search, RotateCw } from 'lucide-react'
 import { api } from '../api.js'
 import StatusIcon, { StatusCircle } from './StatusIcon.jsx'
 import RunWorkflowMenu from './RunWorkflowMenu.jsx'
@@ -10,7 +10,18 @@ const STATUS_OPTIONS = ['success', 'failed', 'running', 'queued', 'cancelled']
 const STATUS_LABEL = { success: 'Passed', failed: 'Failed', running: 'Running', queued: 'Queued', cancelled: 'Cancelled' }
 const PAGE_SIZE = 25
 
-export default function RunsView({ repoPath, workflows, workflowFile, health, runs, runsError, onOpenRun, onOpenSecrets }) {
+export default function RunsView({
+  repoPath,
+  workflows,
+  workflowFile,
+  health,
+  runs,
+  runsError,
+  onOpenRun,
+  onOpenSecrets,
+  onRescan,
+  scanning,
+}) {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [eventFilter, setEventFilter] = useState('')
@@ -44,7 +55,20 @@ export default function RunsView({ repoPath, workflows, workflowFile, health, ru
       <div className="runs-view__head">
         <div>
           <h2>{workflow ? workflow.name : 'All workflows'}</h2>
-          <p className="runs-view__subtitle">{workflow ? workflow.file : 'Every workflow run for this repo'}</p>
+          <p className="runs-view__subtitle">
+            {workflow ? workflow.file : 'Every workflow run for this repo'}
+            {workflow && (
+              <button
+                className={`runs-view__sync${scanning ? ' runs-view__sync--spinning' : ''}`}
+                onClick={onRescan}
+                disabled={scanning}
+                title="Reload this workflow from disk — picks up edits made outside the app"
+              >
+                <RotateCw size={12} />
+                Sync
+              </button>
+            )}
+          </p>
         </div>
         {workflow && !workflow.parseError && (
           <RunWorkflowMenu
@@ -243,40 +267,35 @@ function RecentActivity({ runs, wfName }) {
   )
 }
 
+// Same borderless-tile language as the Overview hero row — quiet by
+// default, color only shows up when there's something to react to.
 function StatCards({ runs }) {
   const stats = computeRunStats(runs)
-  const pct = (n) => (stats.total ? `${((n / stats.total) * 100).toFixed(1)}%` : '—')
   return (
-    <div className="stat-cards">
-      <div className="stat-card">
-        <span className="stat-card__label"><Users size={12} /> Total runs</span>
-        <span className="stat-card__value">{stats.total}</span>
-        <span className="stat-card__sub">All time</span>
+    <div className="overview__tiles">
+      <div className="overview__tile">
+        <span className="overview__tile-value">{stats.total}</span>
+        <span className="overview__tile-label">Total runs</span>
       </div>
-      <div className="stat-card stat-card--passed">
-        <span className="stat-card__label"><CheckCircle2 size={12} /> Successful</span>
-        <span className="stat-card__value">{stats.passed}</span>
-        <span className="stat-card__sub">{pct(stats.passed)}</span>
+      <div className="overview__tile">
+        <span className="overview__tile-value">{stats.passed}</span>
+        <span className="overview__tile-label">Successful</span>
       </div>
-      <div className="stat-card stat-card--failed">
-        <span className="stat-card__label"><XCircle size={12} /> Failed</span>
-        <span className="stat-card__value">{stats.failed}</span>
-        <span className="stat-card__sub">{pct(stats.failed)}</span>
+      <div className={`overview__tile${stats.failed > 0 ? ' overview__tile--bad' : ''}`}>
+        <span className="overview__tile-value">{stats.failed}</span>
+        <span className="overview__tile-label">Failed</span>
       </div>
-      <div className="stat-card stat-card--running">
-        <span className="stat-card__label"><Loader2 size={12} /> In progress</span>
-        <span className="stat-card__value">{stats.running}</span>
-        <span className="stat-card__sub">{pct(stats.running)}</span>
+      <div className={`overview__tile${stats.running > 0 ? ' overview__tile--active' : ''}`}>
+        <span className="overview__tile-value">{stats.running}</span>
+        <span className="overview__tile-label">In progress</span>
       </div>
-      <div className="stat-card">
-        <span className="stat-card__label"><CircleSlash size={12} /> Cancelled</span>
-        <span className="stat-card__value">{stats.cancelled}</span>
-        <span className="stat-card__sub">{pct(stats.cancelled)}</span>
+      <div className="overview__tile">
+        <span className="overview__tile-value">{stats.cancelled}</span>
+        <span className="overview__tile-label">Cancelled</span>
       </div>
-      <div className="stat-card">
-        <span className="stat-card__label"><Clock size={12} /> Avg. duration</span>
-        <span className="stat-card__value">{stats.avgDurationMs != null ? formatDurationMs(stats.avgDurationMs) : '—'}</span>
-        <span className="stat-card__sub">&nbsp;</span>
+      <div className="overview__tile">
+        <span className="overview__tile-value">{stats.avgDurationMs != null ? formatDurationMs(stats.avgDurationMs) : '—'}</span>
+        <span className="overview__tile-label">Avg. duration</span>
       </div>
     </div>
   )

@@ -17,6 +17,7 @@ import (
 	"local-action/internal/db"
 	"local-action/internal/runs"
 	"local-action/internal/secrets"
+	"local-action/internal/terminal"
 	"local-action/internal/workflows"
 	"local-action/internal/ws"
 )
@@ -31,7 +32,7 @@ func newTestRouter(t *testing.T, actStub string) (*http.ServeMux, *sql.DB, strin
 	key := make([]byte, secrets.KeySize)
 	hub := ws.NewHub()
 	engine := runs.NewEngine(db, key, actStub, hub.Broadcast, hub.Forget)
-	return NewRouter(db, key, engine, hub, actStub), db, dir
+	return NewRouter(db, key, engine, hub, terminal.NewManager(), actStub), db, dir
 }
 
 func TestAPI_ScanSecretsAndRunLifecycle(t *testing.T) {

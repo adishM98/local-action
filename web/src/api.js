@@ -33,4 +33,8 @@ export const api = {
   listRuns: (repoPath) => request('GET', `/api/runs?repoPath=${encodeURIComponent(repoPath)}`),
   getRun: (id) => request('GET', `/api/runs/${id}`),
   cancelRun: (id) => request('POST', `/api/runs/${id}/cancel`),
+  createTerminalSession: (repoPath) => request('POST', '/api/terminal/sessions', { repoPath }),
+  listTerminalSessions: (repoPath) =>
+    request('GET', `/api/terminal/sessions?repoPath=${encodeURIComponent(repoPath)}`),
+  killTerminalSession: (id) => request('DELETE', `/api/terminal/sessions/${id}`),
 }

@@ -10,6 +10,7 @@ import (
 	"local-action/internal/httpapi"
 	"local-action/internal/runs"
 	"local-action/internal/secrets"
+	"local-action/internal/terminal"
 	"local-action/internal/ws"
 	"local-action/web"
 )
@@ -37,8 +38,9 @@ func main() {
 
 	hub := ws.NewHub()
 	engine := runs.NewEngine(db, key, *actBin, hub.Broadcast, hub.Forget)
+	term := terminal.NewManager()
 
-	mux := httpapi.NewRouter(db, key, engine, hub, *actBin)
+	mux := httpapi.NewRouter(db, key, engine, hub, term, *actBin)
 
 	staticFS, err := fs.Sub(web.Dist, "dist")
 	if err != nil {

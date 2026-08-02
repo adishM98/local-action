@@ -16,6 +16,7 @@ import (
 
 	"local-action/internal/runs"
 	"local-action/internal/secrets"
+	"local-action/internal/terminal"
 	"local-action/internal/workflows"
 	"local-action/internal/ws"
 )
@@ -30,7 +31,7 @@ func readJSON(r *http.Request, v any) error {
 	return json.NewDecoder(r.Body).Decode(v)
 }
 
-func NewRouter(db *sql.DB, key []byte, engine *runs.Engine, hub *ws.Hub, actBin string) *http.ServeMux {
+func NewRouter(db *sql.DB, key []byte, engine *runs.Engine, hub *ws.Hub, term *terminal.Manager, actBin string) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
@@ -278,6 +279,48 @@ func NewRouter(db *sql.DB, key []byte, engine *runs.Engine, hub *ws.Hub, actBin 
 			return
 		}
 		hub.ServeWS(w, r, id)
+	})
+
+	mux.HandleFunc("POST /api/terminal/sessions", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			RepoPath string `json:"repoPath"`
+		}
+		if err := readJSON(r, &body); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if body.RepoPath == "" {
+			http.Error(w, "repoPath required", http.StatusBadRequest)
+			return
+		}
+		session, err := term.Create(body.RepoPath)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"id": session.ID})
+	})
+
+	mux.HandleFunc("GET /api/terminal/sessions", func(w http.ResponseWriter, r *http.Request) {
+		repoPath := r.URL.Query().Get("repoPath")
+		writeJSON(w, http.StatusOK, term.List(repoPath))
+	})
+
+	mux.HandleFunc("DELETE /api/terminal/sessions/{id}", func(w http.ResponseWriter, r *http.Request) {
+		if !term.Kill(r.PathValue("id")) {
+			http.Error(w, "session not found", http.StatusNotFound)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	mux.HandleFunc("GET /ws/terminal/{id}", func(w http.ResponseWriter, r *http.Request) {
+		session, ok := term.Get(r.PathValue("id"))
+		if !ok {
+			http.Error(w, "session not found", http.StatusNotFound)
+			return
+		}
+		session.ServeWS(w, r)
 	})
 
 	return mux
