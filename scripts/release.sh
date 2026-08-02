@@ -81,10 +81,16 @@ git push origin "$TAG"
 
 echo
 echo "==> 4. Creating GitHub release"
+# Versioned assets are canonical (Homebrew formula pins to these by exact
+# sha256); the unversioned copies exist purely so releases/latest/download/
+# links in the README work without anyone substituting a version by hand.
 gh release create "$TAG" \
   "$ROOT/build/local-action_${VERSION}_darwin_arm64" \
   "$ROOT/build/local-action_${VERSION}_darwin_amd64" \
   "$ROOT/build/local-action_${VERSION}_darwin_arm64.dmg" \
+  "$ROOT/build/local-action_darwin_arm64" \
+  "$ROOT/build/local-action_darwin_amd64" \
+  "$ROOT/build/local-action_darwin_arm64.dmg" \
   --repo "$GH_REPO" \
   --title "$TAG" \
   --generate-notes

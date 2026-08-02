@@ -92,10 +92,18 @@ ln -s /Applications "$DMG_STAGING/Applications"
 hdiutil create -volname "local-action ${VERSION}" -srcfolder "$DMG_STAGING" -ov -format UDZO "$DMG_PATH" >/dev/null
 rm -rf "$DMG_STAGING"
 
+# Unversioned copy too — same reasoning as release-macos.sh: a
+# releases/latest/download/ link needs a filename that doesn't change
+# release to release, or a copy-pasted curl command with a literal
+# "<version>" in it just downloads GitHub's error page instead of a DMG.
+UNVERSIONED_DMG="$BUILD_DIR/local-action_darwin_arm64.dmg"
+cp "$DMG_PATH" "$UNVERSIONED_DMG"
+
 echo
 echo "==> Done"
 echo "    App:  $APP_DIR"
 echo "    DMG:  $DMG_PATH  ($(shasum -a 256 "$DMG_PATH" | awk '{print $1}'))"
+echo "          $UNVERSIONED_DMG (identical, stable filename for the 'latest' download link)"
 echo
 echo "No Apple Developer ID yet — this DMG is unsigned. Anyone downloading it"
 echo "via a browser will hit Gatekeeper's \"unidentified developer\" warning"

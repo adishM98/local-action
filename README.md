@@ -19,7 +19,7 @@ Single user, no auth, no accounts. Meant to run on your own machine or a home se
 If your browser doesn't actually start the download (some silently swallow `.dmg` links), grab it with curl instead:
 
 ```bash
-curl -L -o local-action.dmg https://github.com/adishM98/local-action/releases/latest/download/local-action_<version>_darwin_arm64.dmg
+curl -L -o local-action.dmg https://github.com/adishM98/local-action/releases/latest/download/local-action_darwin_arm64.dmg
 open local-action.dmg
 ```
 
@@ -46,7 +46,7 @@ Open `http://localhost:8090`.
 ### Or a prebuilt binary directly (macOS)
 
 ```bash
-curl -L -o local-action https://github.com/adishM98/local-action/releases/latest/download/local-action_<version>_darwin_arm64   # or _amd64 on Intel
+curl -L -o local-action https://github.com/adishM98/local-action/releases/latest/download/local-action_darwin_arm64   # or _amd64 on Intel
 chmod +x local-action
 ./local-action
 ```

@@ -58,12 +58,12 @@ Output: `build/local-action_0.1.0_darwin_arm64.dmg`.
 ```bash
 git tag v0.1.0
 git push origin v0.1.0
-gh release create v0.1.0 build/local-action_0.1.0_darwin_* \
+gh release create v0.1.0 build/local-action_* \
   --title "v0.1.0" \
   --notes "See CHANGELOG or write release notes here."
 ```
 
-`build/local-action_0.1.0_darwin_*` globs in the DMG too (`local-action_0.1.0_darwin_arm64.dmg`) as long as you built it in step 2 — no need to list it separately.
+`build/local-action_*` picks up all six assets (versioned + unversioned binaries and DMG) as long as you built both in steps 1 and 2 — nothing else in `build/` matches that prefix.
 
 ## 4. Update the Homebrew tap
 
@@ -99,7 +99,9 @@ scripts/release.sh 0.1.0        # prompts for confirmation before publishing any
 scripts/release.sh 0.1.0 --yes  # skip the prompt (CI use)
 ```
 
-Runs steps 1–4 above in order (plain binaries → DMG app → tag/push → GitHub release with all three assets → regenerate + validate + publish the Homebrew formula). Requires `gh` authenticated and `brew` installed; refuses to run on a dirty working tree or if the tag already exists.
+Runs steps 1–4 above in order (plain binaries → DMG app → tag/push → GitHub release with six assets → regenerate + validate + publish the Homebrew formula). Requires `gh` authenticated and `brew` installed; refuses to run on a dirty working tree or if the tag already exists.
+
+Each release carries two copies of every asset: a versioned one (`local-action_0.1.0_darwin_arm64`, `..._darwin_arm64.dmg`, etc — what the Homebrew formula pins to by exact sha256) and an unversioned one (`local-action_darwin_arm64`, `local-action_darwin_arm64.dmg`). The unversioned copies exist so `releases/latest/download/<name>` links work as *stable* URLs — GitHub's "latest" alias needs an exact filename, and a versioned name would mean every curl command in the README breaks (or worse, silently downloads a 404 page instead of the binary) the moment a new version ships and someone reuses an old command, or copy-pastes a `<version>` placeholder verbatim without substituting it.
 
 ## Installing from a release (what users do)
 
@@ -109,7 +111,14 @@ Runs steps 1–4 above in order (plain binaries → DMG app → tag/push → Git
 https://github.com/adishM98/local-action/releases/latest
 ```
 
-Download `local-action_<version>_darwin_arm64.dmg`, open it, drag `LocalAction.app` to Applications, launch it. Docker still needs to be installed and running separately — the app looks for `act` on `PATH` and falls back to common Homebrew install locations (`/opt/homebrew/bin`, `/usr/local/bin`) since a Finder-launched app gets a minimal `PATH` that often doesn't include it.
+or via curl (stable link, no version to substitute):
+
+```bash
+curl -L -o local-action.dmg https://github.com/adishM98/local-action/releases/latest/download/local-action_darwin_arm64.dmg
+open local-action.dmg
+```
+
+Open the DMG, drag `LocalAction.app` to Applications, launch it. Docker still needs to be installed and running separately — the app looks for `act` on `PATH` and falls back to common Homebrew install locations (`/opt/homebrew/bin`, `/usr/local/bin`) since a Finder-launched app gets a minimal `PATH` that often doesn't include it.
 
 **Homebrew (plain binary, terminal):**
 
@@ -120,7 +129,7 @@ brew install adishM98/local-action/local-action
 **Or directly, no Homebrew:**
 
 ```bash
-curl -L -o local-action https://github.com/adishM98/local-action/releases/download/v0.1.0/local-action_0.1.0_darwin_arm64   # or _amd64 on Intel
+curl -L -o local-action https://github.com/adishM98/local-action/releases/latest/download/local-action_darwin_arm64   # or _amd64 on Intel
 chmod +x local-action
 ./local-action
 ```

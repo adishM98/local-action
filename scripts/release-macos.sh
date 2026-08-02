@@ -33,9 +33,14 @@ for arch in arm64 amd64; do
   name="local-action_${VERSION}_darwin_${arch}"
   GOOS=darwin GOARCH="$arch" CGO_ENABLED=0 go build -o "$BUILD_DIR/$name" ./cmd/local-action
   echo "    $name  ($(shasum -a 256 "$BUILD_DIR/$name" | awk '{print $1}'))"
+  # Unversioned copy too — GitHub's releases/latest/download/<name> alias
+  # needs a name that doesn't change release to release, or a copy-pasted
+  # curl command with a literal "<version>" in it 404s (GitHub's error page
+  # gets saved as if it were the binary, which then just fails to run).
+  cp "$BUILD_DIR/$name" "$BUILD_DIR/local-action_darwin_${arch}"
 done
 
 echo
 echo "==> Done — binaries in build/"
-echo "Next: gh release create v$VERSION build/local-action_${VERSION}_darwin_* --title \"v$VERSION\" --notes \"...\""
+echo "Next: gh release create v$VERSION build/local-action_${VERSION}_darwin_* build/local-action_darwin_* --title \"v$VERSION\" --notes \"...\""
 echo "See docs/RELEASE.md."
