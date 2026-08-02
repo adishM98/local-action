@@ -16,6 +16,13 @@ Single user, no auth, no accounts. Meant to run on your own machine or a home se
 
 [Download the latest `.dmg`](https://github.com/adishM98/local-action/releases/latest), open it, drag **LocalAction** to Applications, launch it. Opens as a real app — Dock icon, native window — no separate browser tab. arm64 (Apple Silicon) only for now.
 
+If your browser doesn't actually start the download (some silently swallow `.dmg` links), grab it with curl instead:
+
+```bash
+curl -L -o local-action.dmg https://github.com/adishM98/local-action/releases/latest/download/local-action_<version>_darwin_arm64.dmg
+open local-action.dmg
+```
+
 Needs Docker running, and [`act`](https://github.com/nektos/act) installed (`brew install act`, or `make bootstrap` from a cloned checkout) — the app looks on `PATH` first, then common Homebrew locations.
 
 Unsigned (no Apple Developer ID yet) — first launch will warn "Apple could not verify..."; right-click → Open once to bypass it.
