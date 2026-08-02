@@ -1,10 +1,17 @@
+/* Three-tier text contrast (primary/secondary/faint) + three-layer surface
+   system (bg/panel/hover). Verified against a real Vercel screenshot: their
+   cards are barely lighter than the true-black page — definition comes
+   from a crisp, clearly-visible border, not a lighter fill. So unlike a
+   "borders as last resort" system, --border here is the primary elevation
+   cue; --panel is closer to --bg on purpose. */
 :root {
-  --bg: #0a0a0a;
-  --panel: #151515;
-  --panel-2: #1d1d1d;
-  --border: #2a2a2a;
-  --text: #e8e8e6;
-  --muted: #8a8a86;
+  --bg: #000000;
+  --panel: #0a0a0a;
+  --panel-2: #141414;
+  --border: rgba(255, 255, 255, 0.14);
+  --text: #f5f5f5;
+  --muted: #a1a1aa;
+  --faint: #71717a;
   /* Color is reserved for workflow state — everything else in the UI
      (nav, focus, selection, logo) stays grayscale. See docs/superpowers/
      specs for the PRD this maps to. */
@@ -23,11 +30,12 @@
 @media (prefers-color-scheme: light) {
   :root {
     --bg: #ffffff;
-    --panel: #f6f8fa;
-    --panel-2: #eaeef2;
-    --border: #d0d7de;
-    --text: #1f2328;
-    --muted: #656d76;
+    --panel: #fafafa;
+    --panel-2: #f2f2f3;
+    --border: rgba(0, 0, 0, 0.08);
+    --text: #18181b;
+    --muted: #52525b;
+    --faint: #a1a1aa;
     --green: #1a7f37;
     --red: #cf222e;
     --yellow: #9a6700;
@@ -35,12 +43,13 @@
   }
 }
 :root[data-theme='dark'] {
-  --bg: #0a0a0a;
-  --panel: #151515;
-  --panel-2: #1d1d1d;
-  --border: #2a2a2a;
-  --text: #e8e8e6;
-  --muted: #8a8a86;
+  --bg: #000000;
+  --panel: #0a0a0a;
+  --panel-2: #141414;
+  --border: rgba(255, 255, 255, 0.14);
+  --text: #f5f5f5;
+  --muted: #a1a1aa;
+  --faint: #71717a;
   --green: #3fb950;
   --red: #f85149;
   --yellow: #d29922;
@@ -48,11 +57,12 @@
 }
 :root[data-theme='light'] {
   --bg: #ffffff;
-  --panel: #f6f8fa;
-  --panel-2: #eaeef2;
-  --border: #d0d7de;
-  --text: #1f2328;
-  --muted: #656d76;
+  --panel: #fafafa;
+  --panel-2: #f2f2f3;
+  --border: rgba(0, 0, 0, 0.08);
+  --text: #18181b;
+  --muted: #52525b;
+  --faint: #a1a1aa;
   --green: #1a7f37;
   --red: #cf222e;
   --yellow: #9a6700;
@@ -94,7 +104,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 .repo-header__brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex: 1;
   min-width: 0;
   background: none;
@@ -103,7 +113,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   cursor: pointer;
   text-align: left;
 }
-.repo-header__brand-logo { width: 48px; height: 48px; border-radius: 7px; flex-shrink: 0; }
+.repo-header__brand-logo { width: 52px; height: 52px; border-radius: 8px; flex-shrink: 0; }
 .repo-header__brand-text { display: flex; flex-direction: column; justify-content: center; min-width: 0; }
 .repo-header__brand-name {
   display: block;
@@ -130,35 +140,15 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   display: flex;
   align-items: center;
   gap: 20px;
-  padding: 12px 24px;
-  background: var(--panel);
+  padding: 12px 20px;
+  /* Slight transparency + blur — a quiet "glass" separation from whatever
+     sits below it, in the spirit of Warp's header treatment, without
+     committing to a fully transparent/overlaid header layout. */
+  background: color-mix(in srgb, var(--panel) 85%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
 }
-.repo-header__identity { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
-.repo-header__icon { color: var(--muted); flex-shrink: 0; }
-.repo-header__text { min-width: 0; }
-/* Quieted deliberately — this is "where you are" context, not a nav
-   destination, and previously matched (or exceeded) the Overview/Secrets
-   nav items in size+weight, so nothing established which was primary. */
-.sidebar__repo-eyebrow {
-  display: block;
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 1px;
-}
-.repo-header__name {
-  display: block;
-  font-weight: 600;
-  font-size: 13px;
-  letter-spacing: -0.01em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.repo-header__name--empty { color: var(--muted); font-weight: 400; }
 /* Always-visible hairline border so this reads as a clickable field at
    rest, not plain static text — the earlier text-only treatment tested as
    "is this even clickable?" */
@@ -172,16 +162,17 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   background: none;
   border: none;
   padding: 2px 0;
-  color: var(--muted);
-  font-size: 12px;
+  color: var(--text);
+  opacity: 0.7;
+  font-size: 13px;
   cursor: pointer;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  transition: color 150ms ease;
+  transition: opacity 150ms ease;
 }
-.repo-header__meta:hover { color: var(--text); }
+.repo-header__meta:hover { opacity: 1; }
 .repo-header__meta:hover .repo-header__meta-edit { opacity: 1; }
 .repo-header__meta-icon { flex-shrink: 0; }
 /* Branch is the primary thing developers care about here — the full path
@@ -190,14 +181,14 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
    the full path otherwise lives in this button's title tooltip, not
    inline, per feedback that it "doesn't need to be visible all the time". */
 .repo-header__meta-path { font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; }
-.repo-header__meta-edit { flex-shrink: 0; margin-left: 2px; opacity: 0.4; transition: opacity 150ms ease; }
+.repo-header__meta-edit { flex-shrink: 0; margin-left: 2px; opacity: 0.6; transition: opacity 150ms ease; }
 
 .repo-header__path-wrap { flex: 1; position: relative; display: flex; }
 .repo-header__path-input {
   flex: 1;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   color: var(--text);
   font-family: var(--mono);
   font-size: 13px;
@@ -228,9 +219,16 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 .health__item--pending { background: rgba(210, 153, 34, 0.12); color: var(--yellow); }
 
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
-.dot--ok { background: var(--green); }
+.dot--ok { background: var(--green); animation: dot-pulse 2s ease-in-out infinite; }
 .dot--bad { background: var(--red); }
 .dot--pending { background: var(--yellow); }
+/* A healthy Docker/act connection reads as "alive," not just a static
+   green checkmark — subtle, slow, well under the 150ms interaction-motion
+   ceiling (this is ambient, not a response to input). */
+@keyframes dot-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(63, 185, 80, 0.5); }
+  50% { box-shadow: 0 0 0 3px rgba(63, 185, 80, 0); }
+}
 
 /* ── Shell / sidebar ─────────────────────────────────── */
 .shell { display: flex; flex: 1; min-height: 0; }
@@ -264,7 +262,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   color: var(--muted);
   cursor: pointer;
   padding: 4px;
-  border-radius: 8px;
+  border-radius: 10px;
   margin-bottom: 8px;
 }
 .sidebar__collapse-btn:hover,
@@ -273,11 +271,15 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 /* Repo identity (path/branch) — moved here from the header, which is now
    pure app chrome (logo/name/health). Reuses the .repo-header__* rules
    below, same visual treatment, just a different container. */
-.sidebar__repo { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-.sidebar__repo .sidebar__collapse-btn { margin-bottom: 0; flex-shrink: 0; }
+/* Absolutely positioned, out of flow — with the repo block gone, giving
+   this its own full-width row left it floating alone over a lot of dead
+   space. Overlaid instead, vertically centered against the first nav row
+   (.sidebar__fixed's extra top padding reserves room for it so it doesn't
+   collide with the Overview button's own text/icon). */
+.sidebar__toolbar { position: absolute; top: 6px; right: 8px; z-index: 2; }
 /* Fixed zone (nav/search/favorites) never scrolls; only the workflow
    explorer below it does — same split VSCode's Explorer sidebar uses. */
-.sidebar__fixed { flex-shrink: 0; padding: 16px 8px 0; }
+.sidebar__fixed { flex-shrink: 0; padding: 34px 8px 0; }
 .sidebar__scroll { flex: 1; overflow-y: auto; padding: 0 8px 16px; }
 
 .sidebar__heading {
@@ -325,11 +327,8 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   text-align: left;
   background: none;
   border: none;
-  /* Left edge stays square — the active state's inset left-accent bar
-     (below) would otherwise curve around a rounded corner and render as a
-     stray "(" bracket instead of a clean vertical line. */
-  border-radius: 0 6px 6px 0;
-  padding: 4px 8px;
+  border-radius: 8px;
+  padding: 6px 8px;
   cursor: pointer;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -339,7 +338,10 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 .sidebar__item:hover { background: var(--panel-2); }
 /* Left-accent-only (no fill) read as invisible in practice — light fill
    plus the accent bar together, still short of a "heavy" solid highlight. */
-.sidebar__item.active { background: var(--panel-2); font-weight: 600; box-shadow: inset 2px 0 0 var(--text); }
+/* Filled rounded pill, inset from the sidebar's edges — matches Vercel's
+   actual nav selection treatment (verified against a real screenshot): a
+   soft background rectangle, no accent bar or colored line at all. */
+.sidebar__item.active { background: var(--panel-2); color: var(--text); font-weight: 600; }
 .sidebar__item--flat { display: flex; align-items: center; gap: 8px; }
 /* Application-nav items (Overview, Secrets) read as medium weight — a
    step below the bold repo name, a step above regular workflow rows. */
@@ -353,7 +355,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   width: 100%;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   color: var(--text);
   padding: 4px 40px 4px 28px;
   font-size: 12px;
@@ -417,10 +419,26 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   transition: color 150ms ease;
 }
 .sidebar__group-heading:hover { color: var(--text); }
-.sidebar__group-chevron { width: 10px; font-size: 10px; flex-shrink: 0; }
+/* A thin unicode triangle at --muted reads as almost nothing on true
+   black — brighter + slightly bigger so it's actually visible as an
+   expand/collapse affordance, not just implied by the row being clickable. */
+.sidebar__group-chevron { width: 12px; font-size: 12px; color: var(--text); opacity: 0.7; flex-shrink: 0; }
 .sidebar__group-icon { flex-shrink: 0; }
 .sidebar__group-count { color: var(--muted); font-weight: 400; text-transform: none; letter-spacing: normal; margin-left: 2px; }
 
+/* Thin guide line tying a category's rows back to its own icon above —
+   a small hierarchy cue (borrowed from a nested-nav reference pattern)
+   that reads as "these belong to that group" without extra text. */
+.sidebar__group-items { position: relative; }
+.sidebar__group-items::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  bottom: 4px;
+  left: 21px;
+  width: 1px;
+  background: var(--border);
+}
 .sidebar__item-row { position: relative; display: flex; align-items: center; }
 .sidebar__item-row .sidebar__item { flex: 1; padding-left: 40px; }
 .sidebar__item-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
@@ -481,7 +499,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   justify-content: space-between;
   margin-bottom: 24px;
 }
-.runs-view__subtitle { color: var(--muted); font-size: 13px; margin: 4px 0 0; }
+.runs-view__subtitle { color: var(--muted); font-size: 13px; margin: 10px 0 0; }
 
 .recent-activity { margin-bottom: 24px; }
 .recent-activity__heading {
@@ -533,7 +551,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   flex: 1;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   color: var(--text);
   padding: 6px 10px 6px 32px;
   font-size: 13px;
@@ -541,40 +559,42 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 .toolbar select {
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   color: var(--text);
   padding: 6px 10px;
   font-size: 13px;
 }
+/* Flat at rest, shadow only appears on hover — Vercel's cards don't
+   announce elevation until you actually interact with them. */
 .stat-card {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
   padding: 22px;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  border-left: 2px solid var(--border);
+  border-radius: 10px;
+  transition: transform 120ms ease, box-shadow 120ms ease;
 }
-.stat-card__value { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+.stat-card__value { font-size: 32px; font-weight: 700; letter-spacing: -0.02em; color: var(--text); }
 .stat-card__label {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 .stat-card__sub { font-size: 12px; color: var(--muted); }
-.stat-card--passed .stat-card__value { color: var(--green); }
-.stat-card--failed .stat-card__value { color: var(--red); }
-.stat-card--running .stat-card__value { color: var(--blue); }
+.stat-card--passed { border-left-color: var(--green); }
+.stat-card--failed { border-left-color: var(--red); }
+.stat-card--running { border-left-color: var(--blue); }
+.stat-card:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); }
 
 .banner {
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 8px 12px;
   margin-bottom: 12px;
   font-size: 13px;
@@ -584,7 +604,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 /* No overflow:hidden here — it used to clip the row's overflow-menu
    dropdown (position:absolute, extends below the row) for any row near
    the bottom of the list. Rounded corners live on the end rows instead. */
-.run-rows { border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06); }
+.run-rows { border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06); }
 .run-row {
   display: flex;
   align-items: center;
@@ -599,8 +619,8 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   transition: background-color 120ms ease, box-shadow 120ms ease;
   position: relative;
 }
-.run-row:first-child { border-radius: 8px 8px 0 0; }
-.run-row:last-child { border-bottom: none; border-radius: 0 0 8px 8px; }
+.run-row:first-child { border-radius: 10px 10px 0 0; }
+.run-row:last-child { border-bottom: none; border-radius: 0 0 10px 10px; }
 .run-row:hover {
   background: var(--panel);
   box-shadow: inset 2px 0 0 var(--text), 0 1px 8px rgba(0, 0, 0, 0.4);
@@ -616,7 +636,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 .run-row__overflow-btn {
   background: none;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: 10px;
   color: var(--muted);
   width: 26px;
   height: 26px;
@@ -631,7 +651,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   min-width: 140px;
   background: var(--panel-2);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 4px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.85);
 }
@@ -718,7 +738,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 .btn {
   background: var(--panel-2);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 5px 14px;
   cursor: pointer;
   font-size: 13px;
@@ -755,7 +775,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 .field input, .field select, .field-row select, .secrets-page input, .secrets-page select {
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   color: var(--text);
   padding: 5px 10px;
   font-size: 13px;
@@ -771,7 +791,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   width: 100%;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   color: var(--text);
   padding: 8px 10px;
   font-family: var(--mono);
@@ -796,7 +816,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   width: 320px;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 14px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.85);
 }
@@ -832,7 +852,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   justify-content: center;
   background: var(--panel-2);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   color: var(--muted);
   width: 28px;
   height: 28px;
@@ -853,7 +873,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 
 .job-card {
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   margin-bottom: 20px;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
@@ -919,6 +939,10 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   line-height: 1.7;
   color: var(--text);
   overflow-x: auto;
+  animation: step-lines-in 150ms ease;
+}
+@keyframes step-lines-in {
+  from { opacity: 0; transform: translateY(-2px); }
 }
 /* Two-column flex row (number | text) instead of native <ol> numbering —
    list-style-position:inside can't hang-indent wrapped lines under the
@@ -987,56 +1011,116 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 .chip:hover { border-color: var(--text); color: var(--text); }
 
 /* ── Overview page ───────────────────────────────────── */
-.overview__head { margin-bottom: 24px; }
+.overview__head { margin-bottom: 20px; }
+/* Repo identity moved here from the sidebar — this is the one place you
+   can change the repo path now, so it carries the icon/branch/edit
+   affordance the sidebar used to have. The sidebar keeps a plain
+   read-only name so you always know where you are. */
+.overview__identity { display: flex; align-items: center; gap: 12px; }
+.overview__identity-icon { color: var(--muted); flex-shrink: 0; }
+.overview__identity-text { min-width: 0; }
+.overview__identity-text h2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.overview__identity-input { flex: 1; max-width: 420px; }
+/* The status line is the actual hero — "is anything broken?" answered in
+   one sentence before a single number is read. Stays gray/quiet when
+   healthy; only escalates color when there's something to react to. */
+.overview__status { margin: 6px 0 0; font-size: 14px; color: var(--muted); }
+.overview__status--active { color: var(--blue); }
+.overview__status--bad { color: var(--red); }
 
-.overview__stats {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 28px;
-}
-.overview__stat {
-  flex: 1;
+/* Tiles, not cards — no border/background/box. A plain number+label pair
+   separated by a hairline divider, so three of them read as one quiet
+   strip instead of three competing boxes. Color only appears on the
+   number itself, and only when the count is actually nonzero. */
+/* Full-width bottom border — without it the row just trails off into
+   empty space after the 3rd tile on any wide viewport, since the tiles
+   themselves don't stretch or carry a boundary. The line closes the row
+   into a deliberate band instead. */
+.overview__tiles { display: flex; padding-bottom: 24px; margin-bottom: 28px; border-bottom: 1px solid var(--border); }
+.overview__tile {
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  padding: 18px 22px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  gap: 4px;
+  padding: 4px 28px;
+  border-left: 1px solid var(--border);
 }
-.overview__stat-value { font-size: 28px; font-weight: 600; letter-spacing: -0.01em; }
-.overview__stat-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-.overview__stat--running .overview__stat-value { color: var(--blue); }
-.overview__stat--failed .overview__stat-value { color: var(--red); }
-.overview__stat--passed .overview__stat-value { color: var(--green); }
+.overview__tile:first-child { padding-left: 0; border-left: none; }
+.overview__tile-value { font-size: 36px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; color: var(--text); }
+.overview__tile-label { font-size: 13px; color: var(--muted); }
+.overview__tile--active .overview__tile-value { color: var(--blue); }
+.overview__tile--bad .overview__tile-value { color: var(--red); }
+
+/* Success-rate progress bar — the one place color/gradient is used
+   decoratively rather than for state, tying it back to the logo's own
+   blue→purple accent. */
+.overview__success { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.overview__success-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  overflow: hidden;
+}
+.overview__success-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #6d8dfb, #8b5cf6);
+  transition: width 300ms ease;
+}
+.overview__success-pct { font-size: 13px; font-weight: 600; color: var(--text); flex-shrink: 0; width: 36px; text-align: right; }
 
 .overview__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 20px;
-  align-items: start;
+  /* stretch, not start — a short card (e.g. Recent activity with one row)
+     sitting next to a taller one (Repository health's chart) used to end
+     abruptly, leaving a lopsided row instead of two matched cards. */
+  align-items: stretch;
 }
+.overview__card { display: flex; flex-direction: column; }
+/* Repository health carries more content (a 4-row summary + a 7-day trend
+   chart) than a short run list — giving it more room reads more
+   intentional than forcing every card to the same width. Degrades
+   gracefully to span:1 automatically once auto-fit collapses to one
+   column on narrow viewports. */
+.overview__section--wide { grid-column: span 2; }
 
+/* Card = title (plain, outside the box) + section (the actual bordered
+   surface, content only) — matches Vercel's own pattern (verified against
+   a real screenshot): "Usage"/"Alerts"/"Projects" sit in the whitespace
+   above their panel, not inside it as a boxed title bar. */
+/* No margin-bottom here — inside .overview__grid, spacing between cards
+   comes from the grid's own gap; adding margin too would double up
+   vertical spacing whenever cards wrap to a second row. The one
+   .overview__card rendered outside the grid (incompatible-runners) gets
+   its bottom margin from the .overview__incompatible-card modifier. */
 .overview__section {
+  flex: 1;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  border-radius: 10px;
   padding: 16px 18px;
+  transition: transform 120ms ease, box-shadow 120ms ease;
 }
+.overview__section:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); }
 .overview__section-title {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 13px;
   font-weight: 600;
-  margin: 0 0 10px;
+  margin: 0 0 8px 2px;
   color: var(--text);
 }
+/* Icon stays quiet/muted — a small marker, not a decoration competing
+   with the section's own content for attention. */
+.overview__section-title svg { color: var(--muted); }
 
-.overview__incompatible-card { margin-bottom: 20px; border-color: rgba(210, 153, 34, 0.4); }
+.overview__incompatible-card { margin-bottom: 20px; }
+.overview__incompatible-card .overview__section { border-color: rgba(210, 153, 34, 0.4); }
 .overview__incompatible-card .overview__section-title { color: var(--yellow); }
+.overview__incompatible-card .overview__section-title svg { color: var(--yellow); }
 .overview__row-warn-icon { color: var(--yellow); flex-shrink: 0; }
 .overview__row-meta code { font-family: var(--mono); font-size: 11px; }
 
@@ -1048,7 +1132,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   text-align: left;
   background: none;
   border: none;
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 9px 8px;
   cursor: pointer;
   color: var(--text);
@@ -1056,7 +1140,10 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 }
 .overview__row:hover { background: var(--panel-2); }
 .overview__row-main { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.overview__row-name { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* flex:1 here (not just on .overview__row-main) so a bare name+time row —
+   no meta line, e.g. Recent activity's simplified rows — still pushes the
+   time to the right without needing the wrapper. */
+.overview__row-name { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .overview__row-meta { font-size: 12px; color: var(--muted); }
 .overview__row-time { font-size: 12px; color: var(--muted); white-space: nowrap; }
 

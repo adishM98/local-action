@@ -160,3 +160,7 @@ export function filterRuns(runs, { search, status, event, branch }, resolveName)
     return haystack.includes(q)
   })
 }
+
+export function repoNameFor(path) {
+  return path ? path.split('/').filter(Boolean).pop() || path : ''
+}

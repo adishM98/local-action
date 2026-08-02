@@ -118,8 +118,6 @@ export default function App() {
       <div className="shell">
         <Sidebar
           repoPath={repoPath}
-          onCommit={commitRepoPath}
-          branch={branch}
           workflows={workflows}
           scanState={scanState}
           scanning={scanning}
@@ -132,6 +130,8 @@ export default function App() {
           {view.name === 'overview' && (
             <Overview
               repoPath={repoPath}
+              onCommit={commitRepoPath}
+              branch={branch}
               workflows={workflows}
               runs={runs}
               onOpenRun={setDrawerRunId}

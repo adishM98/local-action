@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { Container, Sun, Moon, Monitor, Check } from 'lucide-react'
+import { Sun, Moon, Monitor, Check } from 'lucide-react'
+import HealthItem from './HealthItem.jsx'
 
 const THEME_KEY = 'theme'
 
@@ -49,26 +50,9 @@ function useTheme() {
   return [mode, effective, setMode]
 }
 
-function HealthItem({ icon: Icon, label, ok, error, onClick }) {
-  const state = ok == null ? 'pending' : ok ? 'ok' : 'bad'
-  const title =
-    ok == null
-      ? `checking ${label}…`
-      : ok
-        ? `${label} ready — click to recheck`
-        : `${label} not available${error ? `: ${error}` : ''} — click to recheck`
-  return (
-    <button className={`health__item health__item--${state}`} title={title} onClick={onClick}>
-      <span className={`dot dot--${state}`} />
-      {Icon && <Icon size={13} />}
-      {label}
-    </button>
-  )
-}
-
 // Pure app chrome — brand + Docker/act health + theme. Repo identity (path,
-// branch) lives in the sidebar now: this bar is "the app," the sidebar is
-// "the repo you're pointed at" — two different concepts, kept visually
+// branch) lives on the Overview page now: this bar is "the app," Overview
+// is "the repo you're pointed at" — two different concepts, kept visually
 // separate instead of mixed into one header.
 export default function RepoHeader({ health, onRecheck, onNavigate }) {
   const [mode, effective, setMode] = useTheme()
@@ -106,7 +90,7 @@ export default function RepoHeader({ health, onRecheck, onNavigate }) {
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
-        <HealthItem icon={Container} label="Docker" ok={health?.dockerOK} error={health?.dockerError} onClick={onRecheck} />
+        <HealthItem label="Docker" ok={health?.dockerOK} error={health?.dockerError} onClick={onRecheck} />
       </div>
     </header>
   )
