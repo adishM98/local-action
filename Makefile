@@ -1,7 +1,7 @@
 WEB_DIR := web
 WEB_SRC := $(shell find $(WEB_DIR)/src -type f) $(WEB_DIR)/package.json $(WEB_DIR)/vite.config.js $(WEB_DIR)/index.html
 
-.PHONY: bootstrap build run dev test lint fmt install db-reset clean release-macos
+.PHONY: bootstrap build run dev test lint fmt install db-reset clean release-macos package-macos-app
 
 bootstrap:
 	./scripts/bootstrap.sh
@@ -53,3 +53,8 @@ clean:
 release-macos:
 	@test -n "$(VERSION)" || { echo "usage: make release-macos VERSION=0.1.0"; exit 1; }
 	./scripts/release-macos.sh $(VERSION)
+
+# make package-macos-app VERSION=0.1.0
+package-macos-app:
+	@test -n "$(VERSION)" || { echo "usage: make package-macos-app VERSION=0.1.0"; exit 1; }
+	./scripts/package-macos-app.sh $(VERSION)

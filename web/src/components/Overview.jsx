@@ -36,8 +36,11 @@ export default function Overview({ repoPath, onCommit, branch, workflows, runs, 
 
   function commitPath() {
     const path = draft.trim()
+    // Nothing to commit — stay in editing mode instead of stranding a
+    // first-time user on a screen with no visible input and no repo name.
+    if (!path) return
     setEditing(false)
-    if (path && path !== repoPath) {
+    if (path !== repoPath) {
       rememberPath(path)
       onCommit(path)
     }

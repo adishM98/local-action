@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# End-to-end macOS release: build binaries, tag + push, publish the GitHub
-# release, regenerate the Homebrew formula, and push it to the separate
-# homebrew-local-action tap repo.
+# End-to-end macOS release: build binaries + the DMG app, tag + push,
+# publish the GitHub release, regenerate the Homebrew formula, and push it
+# to the separate homebrew-local-action tap repo.
 #
 # Usage: scripts/release.sh <version> [--yes]
 #   --yes   skip the confirmation prompt (for CI; interactive use should
@@ -50,12 +50,13 @@ fi
 
 echo
 echo "This will, in order:"
-echo "  1. Build frontend + darwin/arm64 + darwin/amd64 binaries"
-echo "  2. git tag $TAG, git push origin $TAG"
-echo "  3. gh release create $TAG (public, on $GH_REPO)"
-echo "  4. Regenerate homebrew-tap/Formula/local-action.rb for $VERSION"
-echo "  5. Validate it with brew audit (local tap, no push)"
-echo "  6. Push the updated formula to $TAP_REPO (creating it if it doesn't exist yet)"
+echo "  1. Build frontend + darwin/arm64 + darwin/amd64 plain binaries"
+echo "  2. Build the DMG app (LocalAction.app, arm64 only)"
+echo "  3. git tag $TAG, git push origin $TAG"
+echo "  4. gh release create $TAG (public, on $GH_REPO)"
+echo "  5. Regenerate homebrew-tap/Formula/local-action.rb for $VERSION"
+echo "  6. Validate it with brew audit (local tap, no push)"
+echo "  7. Push the updated formula to $TAP_REPO (creating it if it doesn't exist yet)"
 echo
 if [[ -z "$YES" ]]; then
   read -r -p "Proceed with releasing $TAG? [y/N] " reply
@@ -70,21 +71,26 @@ SHA_ARM="$(shasum -a 256 "$ROOT/build/local-action_${VERSION}_darwin_arm64" | aw
 SHA_AMD64="$(shasum -a 256 "$ROOT/build/local-action_${VERSION}_darwin_amd64" | awk '{print $1}')"
 
 echo
-echo "==> 2. Tagging and pushing $TAG"
+echo "==> 2. Building the DMG app"
+"$ROOT/scripts/package-macos-app.sh" "$VERSION"
+
+echo
+echo "==> 3. Tagging and pushing $TAG"
 git tag "$TAG"
 git push origin "$TAG"
 
 echo
-echo "==> 3. Creating GitHub release"
+echo "==> 4. Creating GitHub release"
 gh release create "$TAG" \
   "$ROOT/build/local-action_${VERSION}_darwin_arm64" \
   "$ROOT/build/local-action_${VERSION}_darwin_amd64" \
+  "$ROOT/build/local-action_${VERSION}_darwin_arm64.dmg" \
   --repo "$GH_REPO" \
   --title "$TAG" \
   --generate-notes
 
 echo
-echo "==> 4. Regenerating homebrew-tap/Formula/local-action.rb"
+echo "==> 5. Regenerating homebrew-tap/Formula/local-action.rb"
 mkdir -p "$ROOT/homebrew-tap/Formula"
 cat > "$ROOT/homebrew-tap/Formula/local-action.rb" <<FORMULA
 class LocalAction < Formula
@@ -120,7 +126,7 @@ end
 FORMULA
 
 echo
-echo "==> 5. Validating formula (local tap, not pushed anywhere)"
+echo "==> 6. Validating formula (local tap, not pushed anywhere)"
 brew untap adishm98/local-action-validate >/dev/null 2>&1 || true
 (cd "$ROOT/homebrew-tap" && rm -rf .git && git init -q && git add -A && git -c user.email=release@local -c user.name=release commit -q -m validate)
 brew tap adishm98/local-action-validate "file://$ROOT/homebrew-tap"
@@ -134,7 +140,7 @@ brew untap adishm98/local-action-validate
 rm -rf "$ROOT/homebrew-tap/.git"
 
 echo
-echo "==> 6. Publishing to $TAP_REPO"
+echo "==> 7. Publishing to $TAP_REPO"
 if ! gh repo view "$TAP_REPO" >/dev/null 2>&1; then
   gh repo create "$TAP_REPO" --public -d "Homebrew tap for local-action"
 fi
@@ -151,3 +157,4 @@ echo
 echo "==> Done. Released $TAG."
 echo "    brew install $TAP_REPO/local-action"
 echo "    curl -L -o local-action https://github.com/${GH_REPO}/releases/download/${TAG}/local-action_${VERSION}_darwin_arm64"
+echo "    DMG: https://github.com/${GH_REPO}/releases/download/${TAG}/local-action_${VERSION}_darwin_arm64.dmg"

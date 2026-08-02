@@ -2,13 +2,25 @@
   <img src="docs/logo-with-text.png" alt="local-action — run GitHub Actions locally" width="360">
 </p>
 
+<p align="center">
+  <a href="https://github.com/adishM98/local-action/releases/latest"><img src="https://img.shields.io/badge/Download-macOS%20(DMG)-blue?style=for-the-badge&logo=apple" alt="Download for macOS"></a>
+</p>
+
 Selfhosted web UI for running GitHub Actions workflows locally, via Docker — wraps [`act`](https://github.com/nektos/act) so you get a browser UI (secrets, env/vars, run history, live logs) instead of memorizing CLI flags.
 
 Single user, no auth, no accounts. Meant to run on your own machine or a home server, bound to `localhost` only.
 
 ## Install
 
-### macOS, via Homebrew (recommended)
+### macOS, DMG app (recommended — no terminal needed)
+
+[Download the latest `.dmg`](https://github.com/adishM98/local-action/releases/latest), open it, drag **LocalAction** to Applications, launch it. Opens as a real app — Dock icon, native window — no separate browser tab. arm64 (Apple Silicon) only for now.
+
+Needs Docker running, and [`act`](https://github.com/nektos/act) installed (`brew install act`, or `make bootstrap` from a cloned checkout) — the app looks on `PATH` first, then common Homebrew locations.
+
+Unsigned (no Apple Developer ID yet) — first launch will warn "Apple could not verify..."; right-click → Open once to bypass it.
+
+### macOS, via Homebrew (terminal, prebuilt binary)
 
 ```bash
 brew install adishM98/local-action/local-action
@@ -73,6 +85,7 @@ Other targets:
 | `make db-reset` | Remove the local SQLite DB (run history + secrets), keep the binary and built frontend |
 | `make clean` | Remove the binary, local DB, built frontend, and `node_modules` |
 | `make release-macos VERSION=x.y.z` | Build prebuilt macOS binaries (arm64+amd64) for a GitHub release — see [docs/RELEASE.md](docs/RELEASE.md) |
+| `make package-macos-app VERSION=x.y.z` | Build the double-click DMG app (arm64 only) — see [docs/RELEASE.md](docs/RELEASE.md) |
 
 Flags:
 
@@ -115,18 +128,22 @@ npm run dev
 ## Project layout
 
 ```
-cmd/local-action/      entrypoint: main.go (flags, wiring, HTTP server startup)
+cmd/local-action/       entrypoint: main.go (flags, wiring, HTTP server startup) — plain CLI binary
+cmd/local-action-gui/   entrypoint for the DMG app — same server, wrapped in a native webview window
 web/                    Vite/React frontend (src/, dist/ built output, package.json, embed.go)
 internal/
   db/                   SQLite schema + OpenDB
   secrets/              encrypted secrets/vars store, AES-GCM
   workflows/            .github/workflows/*.yml parsing, category overrides, saved event payloads
   runs/                 run history/log storage, act invocation engine (FIFO queue)
-  ws/                   WebSocket log-streaming hub
+  ws/                   WebSocket log-streaming hub for run output
+  terminal/             pty-backed shell sessions behind the in-app terminal panel
   httpapi/              HTTP route wiring
+assets/                 source logo assets used to generate the DMG app's Dock icon
 testdata/sample-repo/   a real workflow file, for manual end-to-end testing
 docs/                   architecture notes, design spec, user guide, release process
-scripts/                bootstrap.sh (dev setup), release-macos.sh (prebuilt-binary releases)
+scripts/                bootstrap.sh (dev setup), release-macos.sh + package-macos-app.sh + release.sh
+                        (prebuilt-binary + DMG releases), flatten-icon.swift (Dock icon generation)
 homebrew-tap/           Formula/local-action.rb — synced into the separate homebrew-local-action tap repo on release
 ```
 

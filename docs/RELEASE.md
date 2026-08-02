@@ -1,8 +1,13 @@
 # Release process (macOS)
 
-Plain prebuilt binaries attached to a GitHub release — no `.app` bundle, no installer. Two ways to get them: a direct `curl` download, or `brew install` via a Homebrew Formula (not Cask — there's no `.app`, just a binary) that installs the same asset.
+Two independent distribution paths, both built from the same source and both attached to the same GitHub release:
 
-## 1. Build the binaries
+- **Plain binary** (`cmd/local-action`) — curl or Homebrew, run from a terminal. No `.app`, no window.
+- **DMG app** (`cmd/local-action-gui`) — double-click, native window (embeds the same web UI via a webview, no external browser tab), Dock icon. arm64 only for now (see below).
+
+They don't affect each other — building/publishing one never touches the other. `scripts/release.sh` runs the entire process below end to end (both binaries, the DMG, tag, GitHub release, Homebrew tap) — see [One-shot: `scripts/release.sh`](#one-shot-scriptsreleasesh) if you just want to run one command.
+
+## 1. Build the plain binaries
 
 ```bash
 make release-macos VERSION=0.1.0
@@ -25,7 +30,30 @@ curl -sf http://127.0.0.1:8090 >/dev/null && echo OK
 kill %1
 ```
 
-## 2. Tag and publish the GitHub release
+## 2. Build the DMG app
+
+```bash
+make package-macos-app VERSION=0.1.0
+```
+
+This runs `scripts/package-macos-app.sh`, which:
+
+1. Builds `cmd/local-action-gui` for **arm64 only** — it needs `CGO_ENABLED=1` (links against WebKit/Cocoa for the embedded window), unlike the plain binary's pure cross-compile. Intel support is possible (Apple's SDK ships universal framework stubs, so cross-compiling cgo via `CC="clang -arch x86_64"` mostly works) but isn't verified here since it can't be tested without an actual Intel Mac — add it if you need it.
+2. Generates `icon.icns` from `assets/logo-1024.png` via `scripts/flatten-icon.swift`. Two things it has to do that a naive flatten wouldn't: bake in the rounded corners (macOS does **not** auto-round a plain custom `.icns` for an unsigned/local-built app — without this it renders as a hard-cornered square next to every other app's rounded tile), and inset the black square to ~85% of the canvas with the logo scaled/centered on its actual visible content, not the source image's own (uneven) padding — full-bleed reads as oversized next to properly-templated icons like Spotify's.
+3. Assembles `build/LocalAction.app` and wraps it in a drag-to-install DMG (`hdiutil`, built into macOS — no `create-dmg` dependency).
+
+Output: `build/local-action_0.1.0_darwin_arm64.dmg`.
+
+**Two gotchas if you touch `cmd/local-action-gui` or the icon script:**
+- The Go runtime can migrate `main()`'s goroutine off the process's original OS thread, which silently breaks Cocoa (the app runs, the HTTP server answers, but no window or Dock icon ever appears — no crash, no error). `main.go` calls `runtime.LockOSThread()` in an `init()` before anything else specifically to prevent this; don't remove it.
+- If you ever build this locally with a plain `go build` instead of the packaging script, double check the output is actually arm64 (`file` the binary). A Go toolchain running under Rosetta on Apple Silicon will silently default to producing an amd64 binary, which runs (registers as a foreground app, even shows briefly in the menu bar) but the window closes itself again within a few seconds.
+- If you change the icon and it doesn't seem to update after reinstalling: that's the Dock's own persistent icon cache, not a build problem. Launchpad tends to pick up a changed icon on its own; the Dock is stickier. Force it:
+  ```bash
+  rm -rf ~/Library/Caches/com.apple.iconservices.store
+  killall Dock; killall Finder
+  ```
+
+## 3. Tag and publish the GitHub release
 
 ```bash
 git tag v0.1.0
@@ -35,7 +63,9 @@ gh release create v0.1.0 build/local-action_0.1.0_darwin_* \
   --notes "See CHANGELOG or write release notes here."
 ```
 
-## 3. Update the Homebrew tap
+`build/local-action_0.1.0_darwin_*` globs in the DMG too (`local-action_0.1.0_darwin_arm64.dmg`) as long as you built it in step 2 — no need to list it separately.
+
+## 4. Update the Homebrew tap
 
 The formula lives in `homebrew-tap/Formula/local-action.rb` in this repo, but Homebrew taps must live in their own repo named `homebrew-<name>` to be installable — there's no way around that, it's Homebrew's own naming rule. First time only:
 
@@ -46,7 +76,7 @@ cp -r homebrew-tap/Formula /tmp/homebrew-local-action/
 cd /tmp/homebrew-local-action && git add -A && git commit -m "Initial formula" && git push
 ```
 
-Every release after that, update `homebrew-tap/Formula/local-action.rb`'s two `url`/`sha256` pairs (printed by the release script) to match the new version, then copy it to the tap repo the same way and push.
+Every release after that, update `homebrew-tap/Formula/local-action.rb`'s two `url`/`sha256` pairs (printed by the release script) to match the new version, then copy it to the tap repo the same way and push. The Homebrew formula only ever tracks the plain binary — it has no notion of the DMG app.
 
 ### Verify the formula before publishing
 
@@ -62,13 +92,32 @@ brew untap adishm98/local-action
 rm -rf homebrew-tap/.git   # don't commit the throwaway repo into local-action itself
 ```
 
+## One-shot: `scripts/release.sh`
+
+```bash
+scripts/release.sh 0.1.0        # prompts for confirmation before publishing anything
+scripts/release.sh 0.1.0 --yes  # skip the prompt (CI use)
+```
+
+Runs steps 1–4 above in order (plain binaries → DMG app → tag/push → GitHub release with all three assets → regenerate + validate + publish the Homebrew formula). Requires `gh` authenticated and `brew` installed; refuses to run on a dirty working tree or if the tag already exists.
+
 ## Installing from a release (what users do)
+
+**DMG (double-click, native window):**
+
+```
+https://github.com/adishM98/local-action/releases/latest
+```
+
+Download `local-action_<version>_darwin_arm64.dmg`, open it, drag `LocalAction.app` to Applications, launch it. Docker still needs to be installed and running separately — the app looks for `act` on `PATH` and falls back to common Homebrew install locations (`/opt/homebrew/bin`, `/usr/local/bin`) since a Finder-launched app gets a minimal `PATH` that often doesn't include it.
+
+**Homebrew (plain binary, terminal):**
 
 ```bash
 brew install adishM98/local-action/local-action
 ```
 
-or directly, no Homebrew:
+**Or directly, no Homebrew:**
 
 ```bash
 curl -L -o local-action https://github.com/adishM98/local-action/releases/download/v0.1.0/local-action_0.1.0_darwin_arm64   # or _amd64 on Intel
@@ -80,9 +129,14 @@ Either way, Docker still needs to be installed and running separately — the Ho
 
 ## Data location
 
-A downloaded binary run directly behaves exactly like `make run` from source: `-db` defaults to `local-action.db` in the current directory, and the encryption key goes to `os.UserConfigDir()/local-action/seed.key`. There's no fixed Application Support path here — that was specific to the `.app`-bundle approach, which this doesn't use.
+A downloaded plain binary run directly behaves exactly like `make run` from source: `-db` defaults to `local-action.db` in the current directory, and the encryption key goes to `os.UserConfigDir()/local-action/seed.key`.
+
+The DMG app is different — a double-clicked app has no meaningful working directory, so `local-action-gui` defaults both the database *and* the key to `~/Library/Application Support/local-action/` (`os.UserConfigDir()` on macOS). Logs go to `local-action.log` in that same directory, since a Finder-launched app has no visible console.
 
 ## Not yet in scope
 
-- Code signing / notarization — no Apple Developer ID yet. `curl` downloads (unlike Safari/Chrome) don't set the `com.apple.quarantine` xattr at all, so the direct-download path avoids Gatekeeper friction entirely — but anyone who downloads the binary via a browser instead may still hit it and need `xattr -d com.apple.quarantine <file>`. Homebrew installs aren't quarantined either way.
+- Code signing / notarization — no Apple Developer ID yet.
+  - Plain binary: `curl` downloads (unlike Safari/Chrome) don't set the `com.apple.quarantine` xattr at all, so the direct-download path avoids Gatekeeper friction entirely — but anyone who downloads it via a browser instead may still hit it and need `xattr -d com.apple.quarantine <file>`. Homebrew installs aren't quarantined either way.
+  - DMG: downloaded via a browser, it **will** get quarantined — first launch shows "Apple could not verify... unidentified developer." Right-click → Open once works around it.
+- Intel (amd64) DMG — see step 2 above, not built by the script yet.
 - Linux binaries / packaging — not built by this script; would need its own if requested.

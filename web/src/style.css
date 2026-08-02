@@ -186,8 +186,8 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 .repo-header__path-wrap { flex: 1; position: relative; display: flex; }
 .repo-header__path-input {
   flex: 1;
-  background: var(--bg);
-  border: 1px solid var(--border);
+  background: var(--panel-2);
+  border: 1px solid var(--muted);
   border-radius: 10px;
   color: var(--text);
   font-family: var(--mono);
@@ -195,7 +195,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   padding: 6px 10px;
   transition: border-color 120ms ease;
 }
-.repo-header__path-input:focus { outline: none; border-color: var(--muted); }
+.repo-header__path-input:focus { outline: none; border-color: var(--text); }
 .repo-header__path-input::placeholder { color: var(--muted); }
 
 .health { display: flex; gap: 4px; }
