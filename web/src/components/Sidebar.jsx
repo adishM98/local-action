@@ -5,11 +5,6 @@ import {
   Search,
   ChevronDown,
   Star,
-  Workflow,
-  Rocket,
-  ShieldCheck,
-  FlaskConical,
-  BookOpen,
   MoreHorizontal,
   PanelLeftClose,
   PanelLeftOpen,
@@ -21,16 +16,7 @@ import {
 import { StatusCircle } from './StatusIcon.jsx'
 import { lastRunByWorkflow, relativeTime } from '../format.js'
 import { isPinned, togglePinned, getPinned } from '../pins.js'
-
-const CATEGORY_ORDER = ['CI/Build', 'Security', 'Testing', 'Deployment', 'Docs', 'Other']
-const CATEGORY_ICON = {
-  'CI/Build': Workflow,
-  Security: ShieldCheck,
-  Testing: FlaskConical,
-  Deployment: Rocket,
-  Docs: BookOpen,
-  Other: MoreHorizontal,
-}
+import { CATEGORY_ORDER, CATEGORY_ICON } from '../categories.js'
 
 const STATUS_FILTERS = [
   { key: '', label: 'All' },
@@ -239,6 +225,7 @@ export default function Sidebar({ repoPath, onCommit, branch, workflows, scanSta
               </div>
             ) : (
               <div className="repo-header__text">
+                <span className="sidebar__repo-eyebrow">Repository</span>
                 <span className="repo-header__name">{repoNameFor(repoPath)}</span>
                 <button
                   className="repo-header__meta"

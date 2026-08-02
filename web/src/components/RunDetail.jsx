@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { X } from 'lucide-react'
+import { X, ChevronRight } from 'lucide-react'
 import { api } from '../api.js'
 import StatusIcon, { StatusBadge } from './StatusIcon.jsx'
 import { relativeTime, duration, formatDurationMs } from '../format.js'
@@ -210,7 +210,10 @@ function JobCard({ job, runStatus }) {
       {job.tail.length > 0 && (
         <div className="job-card__tail">
           {job.tail.map((l) => (
-            <div key={l.no}>{l.text}</div>
+            <div className="log-line" key={l.no}>
+              <span className="log-line__no">{l.no}</span>
+              <span className="log-line__text">{l.text}</span>
+            </div>
           ))}
         </div>
       )}
@@ -228,19 +231,20 @@ function StepRow({ step, runStatus }) {
   return (
     <div className="step">
       <button className="step__header" onClick={() => setUserOpen(!open)}>
-        <span className="step__chevron">{open ? '▾' : '▸'}</span>
+        <ChevronRight size={13} className={`step__chevron${open ? ' step__chevron--open' : ''}`} />
         <StatusIcon status={liveStatus(step.result, runStatus)} />
         <span className="step__name">{step.name}</span>
         {step.durationMs != null && <span className="step__duration">{formatDurationMs(step.durationMs)}</span>}
       </button>
       {open && (
-        <ol className="step__lines">
+        <div className="step__lines">
           {step.lines.map((l) => (
-            <li key={l.no} value={l.no}>
-              {l.text}
-            </li>
+            <div className="log-line" key={l.no}>
+              <span className="log-line__no">{l.no}</span>
+              <span className="log-line__text">{l.text}</span>
+            </div>
           ))}
-        </ol>
+        </div>
       )}
     </div>
   )

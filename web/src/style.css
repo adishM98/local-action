@@ -137,10 +137,22 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 .repo-header__identity { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
 .repo-header__icon { color: var(--muted); flex-shrink: 0; }
 .repo-header__text { min-width: 0; }
+/* Quieted deliberately — this is "where you are" context, not a nav
+   destination, and previously matched (or exceeded) the Overview/Secrets
+   nav items in size+weight, so nothing established which was primary. */
+.sidebar__repo-eyebrow {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 1px;
+}
 .repo-header__name {
   display: block;
-  font-weight: 700;
-  font-size: 15px;
+  font-weight: 600;
+  font-size: 13px;
   letter-spacing: -0.01em;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -185,7 +197,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   flex: 1;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--text);
   font-family: var(--mono);
   font-size: 13px;
@@ -208,6 +220,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   cursor: pointer;
   font-size: 12px;
   white-space: nowrap;
+  transition: border-color 150ms ease;
 }
 .health__item:hover { border-color: var(--border); }
 .health__item--ok { background: rgba(63, 185, 80, 0.12); color: var(--green); }
@@ -251,7 +264,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   color: var(--muted);
   cursor: pointer;
   padding: 4px;
-  border-radius: 6px;
+  border-radius: 8px;
   margin-bottom: 8px;
 }
 .sidebar__collapse-btn:hover,
@@ -260,7 +273,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 /* Repo identity (path/branch) — moved here from the header, which is now
    pure app chrome (logo/name/health). Reuses the .repo-header__* rules
    below, same visual treatment, just a different container. */
-.sidebar__repo { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.sidebar__repo { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
 .sidebar__repo .sidebar__collapse-btn { margin-bottom: 0; flex-shrink: 0; }
 /* Fixed zone (nav/search/favorites) never scrolls; only the workflow
    explorer below it does — same split VSCode's Explorer sidebar uses. */
@@ -334,13 +347,13 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 .sidebar__item--nav + .sidebar__item--nav { margin-top: 2px; }
 .sidebar__item--nav:last-of-type { margin-bottom: 10px; }
 
-.sidebar__search-wrap { position: relative; display: flex; align-items: center; margin: 12px 0 6px; }
+.sidebar__search-wrap { position: relative; display: flex; align-items: center; margin: 10px 0 6px; }
 .sidebar__search-icon { position: absolute; left: 8px; color: var(--muted); pointer-events: none; }
 .sidebar__search {
   width: 100%;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--text);
   padding: 4px 40px 4px 28px;
   font-size: 12px;
@@ -459,7 +472,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   pointer-events: auto;
 }
 
-.content { flex: 1; overflow-y: auto; padding: 24px 32px; }
+.content { flex: 1; overflow-y: auto; padding: 32px 40px; }
 
 /* ── Runs list ───────────────────────────────────────── */
 .runs-view__head {
@@ -520,7 +533,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   flex: 1;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--text);
   padding: 6px 10px 6px 32px;
   font-size: 13px;
@@ -528,7 +541,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 .toolbar select {
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--text);
   padding: 6px 10px;
   font-size: 13px;
@@ -538,10 +551,11 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 20px;
+  padding: 22px;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 .stat-card__value { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
 .stat-card__label {
@@ -560,7 +574,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 
 .banner {
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 8px 12px;
   margin-bottom: 12px;
   font-size: 13px;
@@ -570,7 +584,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 /* No overflow:hidden here — it used to clip the row's overflow-menu
    dropdown (position:absolute, extends below the row) for any row near
    the bottom of the list. Rounded corners live on the end rows instead. */
-.run-rows { border: 1px solid var(--border); border-radius: 6px; }
+.run-rows { border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06); }
 .run-row {
   display: flex;
   align-items: center;
@@ -585,8 +599,8 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   transition: background-color 120ms ease, box-shadow 120ms ease;
   position: relative;
 }
-.run-row:first-child { border-radius: 6px 6px 0 0; }
-.run-row:last-child { border-bottom: none; border-radius: 0 0 6px 6px; }
+.run-row:first-child { border-radius: 8px 8px 0 0; }
+.run-row:last-child { border-bottom: none; border-radius: 0 0 8px 8px; }
 .run-row:hover {
   background: var(--panel);
   box-shadow: inset 2px 0 0 var(--text), 0 1px 8px rgba(0, 0, 0, 0.4);
@@ -602,7 +616,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 .run-row__overflow-btn {
   background: none;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--muted);
   width: 26px;
   height: 26px;
@@ -617,7 +631,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   min-width: 140px;
   background: var(--panel-2);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 4px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.85);
 }
@@ -704,7 +718,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 .btn {
   background: var(--panel-2);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 5px 14px;
   cursor: pointer;
   font-size: 13px;
@@ -741,7 +755,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 .field input, .field select, .field-row select, .secrets-page input, .secrets-page select {
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--text);
   padding: 5px 10px;
   font-size: 13px;
@@ -757,7 +771,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   width: 100%;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--text);
   padding: 8px 10px;
   font-family: var(--mono);
@@ -782,7 +796,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   width: 320px;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 14px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.85);
 }
@@ -818,7 +832,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   justify-content: center;
   background: var(--panel-2);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--muted);
   width: 28px;
   height: 28px;
@@ -831,7 +845,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 /* Title row and meta row are separate lines — cramming badge/title/meta/
    actions onto one row squeezed the meta text into an awkward 2-line wrap
    whenever the title (a full workflow path) was long. */
-.run-detail__head { display: flex; flex-direction: column; gap: 6px; margin: 10px 36px 16px 0; }
+.run-detail__head { display: flex; flex-direction: column; gap: 6px; margin: 12px 40px 22px 0; }
 .run-detail__head-row { display: flex; align-items: center; gap: 10px; }
 .run-detail__head-row h2 { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .run-detail__meta { color: var(--muted); font-size: 13px; }
@@ -839,23 +853,24 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 
 .job-card {
   border: 1px solid var(--border);
-  border-radius: 6px;
-  margin-bottom: 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
   overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 .job-card__head {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 14px;
+  padding: 13px 16px;
   background: var(--panel);
   border-bottom: 1px solid var(--border);
 }
 .job-card__tail {
-  padding: 6px 14px;
-  color: var(--muted);
+  padding: 8px 0;
+  background: var(--bg);
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 12.5px;
 }
 .job-card__duration { margin-left: auto; color: var(--muted); font-size: 12px; white-space: nowrap; }
 .job-card__progress { color: var(--yellow); font-size: 12px; white-space: nowrap; }
@@ -875,31 +890,50 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 .step__header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   width: 100%;
   text-align: left;
   background: none;
   border: none;
-  padding: 8px 14px;
+  padding: 10px 16px;
   cursor: pointer;
+  transition: background-color 120ms ease;
 }
 .step__header:hover { background: var(--panel-2); }
-.step__chevron { color: var(--muted); width: 12px; }
+/* Rotates instead of swapping glyphs (▾/▸) — a smoother, less jarring
+   disclosure affordance than an instant character swap. */
+.step__chevron { color: var(--muted); flex-shrink: 0; transition: transform 150ms ease; }
+.step__chevron--open { transform: rotate(90deg); }
 .step__name { font-size: 13px; }
 .step__duration { margin-left: auto; color: var(--muted); font-size: 12px; white-space: nowrap; }
+/* Log surface deliberately reuses --bg (not --panel-2, a hover-highlight
+   tint) so it reads as a recessed terminal well, not just another chrome
+   panel — darker than the surrounding card in dark theme, brighter/paper-
+   like in light theme, in both cases visually distinct from UI chrome. */
 .step__lines {
   margin: 0;
-  padding: 8px 14px 8px 0;
-  background: var(--panel-2);
+  padding: 10px 0;
+  background: var(--bg);
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 12.5px;
   line-height: 1.7;
   color: var(--text);
   overflow-x: auto;
-  list-style-position: inside;
 }
-.step__lines li { white-space: pre-wrap; padding-left: 46px; }
-.step__lines li::marker { color: var(--muted); }
+/* Two-column flex row (number | text) instead of native <ol> numbering —
+   list-style-position:inside can't hang-indent wrapped lines under the
+   number, so long lines (common in docker/act output) wrapped flush left
+   under the marker instead of staying aligned with the first line's text. */
+.log-line { display: flex; gap: 14px; padding: 0 16px; }
+.log-line__no {
+  flex-shrink: 0;
+  width: 28px;
+  text-align: right;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+.log-line__text { white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; }
 
 /* ── Secrets page ────────────────────────────────────── */
 .secrets-page { max-width: 760px; }
@@ -953,22 +987,23 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 .chip:hover { border-color: var(--text); color: var(--text); }
 
 /* ── Overview page ───────────────────────────────────── */
-.overview__head { margin-bottom: 20px; }
+.overview__head { margin-bottom: 24px; }
 
 .overview__stats {
   display: flex;
-  gap: 12px;
-  margin-bottom: 24px;
+  gap: 16px;
+  margin-bottom: 28px;
 }
 .overview__stat {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 16px 20px;
+  gap: 5px;
+  padding: 18px 22px;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 .overview__stat-value { font-size: 28px; font-weight: 600; letter-spacing: -0.01em; }
 .overview__stat-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
@@ -979,15 +1014,16 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 .overview__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 16px;
+  gap: 20px;
   align-items: start;
 }
 
 .overview__section {
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 14px 16px;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  padding: 16px 18px;
 }
 .overview__section-title {
   display: flex;
@@ -999,6 +1035,11 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   color: var(--text);
 }
 
+.overview__incompatible-card { margin-bottom: 20px; border-color: rgba(210, 153, 34, 0.4); }
+.overview__incompatible-card .overview__section-title { color: var(--yellow); }
+.overview__row-warn-icon { color: var(--yellow); flex-shrink: 0; }
+.overview__row-meta code { font-family: var(--mono); font-size: 11px; }
+
 .overview__row {
   display: flex;
   align-items: center;
@@ -1007,10 +1048,11 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   text-align: left;
   background: none;
   border: none;
-  border-radius: 6px;
-  padding: 8px 6px;
+  border-radius: 8px;
+  padding: 9px 8px;
   cursor: pointer;
   color: var(--text);
+  transition: background-color 120ms ease;
 }
 .overview__row:hover { background: var(--panel-2); }
 .overview__row-main { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }

@@ -1,4 +1,4 @@
-import { Star, Layers, Loader2, XCircle, CheckCircle2 } from 'lucide-react'
+import { Star, Layers, Loader2, XCircle, CheckCircle2, AlertTriangle } from 'lucide-react'
 import StatusIcon, { StatusCircle } from './StatusIcon.jsx'
 import {
   computeRunStats,
@@ -27,6 +27,7 @@ export default function Overview({ repoPath, workflows, runs, onOpenRun, onNavig
   const pinnedFiles = getPinned(repoPath)
   const pinned = pinnedFiles.map((f) => workflows.find((w) => w.file === f)).filter(Boolean)
   const lastStatus = lastStatusByWorkflow(runs)
+  const incompatible = workflows.filter((w) => w.incompatibleRunners?.length > 0)
 
   if (!repoPath) {
     return <p className="empty-state">Enter a repo path above to get started.</p>
@@ -57,6 +58,30 @@ export default function Overview({ repoPath, workflows, runs, onOpenRun, onNavig
           <span className="overview__stat-label">Passing</span>
         </div>
       </div>
+
+      {incompatible.length > 0 && (
+        <section className="overview__section overview__incompatible-card">
+          <h3 className="overview__section-title">
+            <AlertTriangle size={14} /> Runner compatibility ({incompatible.length})
+          </h3>
+          {incompatible.map((wf) => (
+            <button
+              className="overview__row"
+              key={wf.file}
+              onClick={() => onNavigate({ name: 'runs', workflowFile: wf.file })}
+              title={`act only emulates Linux — this may fail or behave differently than real CI`}
+            >
+              <AlertTriangle size={14} className="overview__row-warn-icon" />
+              <span className="overview__row-main">
+                <span className="overview__row-name">{wf.name}</span>
+                <span className="overview__row-meta">
+                  runs-on <code>{wf.incompatibleRunners.join(', ')}</code>
+                </span>
+              </span>
+            </button>
+          ))}
+        </section>
+      )}
 
       {runs.length === 0 ? (
         <div className="empty-state empty-state--rich">
