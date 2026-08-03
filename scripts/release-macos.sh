@@ -31,7 +31,7 @@ echo "==> Building frontend"
 echo "==> Building binaries (CGO disabled — pure Go, no toolchain needed to cross-compile)"
 for arch in arm64 amd64; do
   name="local-action_${VERSION}_darwin_${arch}"
-  GOOS=darwin GOARCH="$arch" CGO_ENABLED=0 go build -o "$BUILD_DIR/$name" ./cmd/local-action
+  GOOS=darwin GOARCH="$arch" CGO_ENABLED=0 go build -ldflags "-X main.version=$VERSION" -o "$BUILD_DIR/$name" ./cmd/local-action
   echo "    $name  ($(shasum -a 256 "$BUILD_DIR/$name" | awk '{print $1}'))"
   # Unversioned copy too — GitHub's releases/latest/download/<name> alias
   # needs a name that doesn't change release to release, or a copy-pasted

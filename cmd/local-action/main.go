@@ -15,6 +15,12 @@ import (
 	"local-action/web"
 )
 
+// version is set at build time via -ldflags "-X main.version=X.Y.Z" (see
+// scripts/release-macos.sh) — "dev" for a plain `go build`/`go run`, which
+// internal/update treats as "never has an update" rather than comparing
+// against a meaningless placeholder.
+var version = "dev"
+
 func main() {
 	addr := flag.String("addr", "127.0.0.1:8090", "listen address")
 	dbPath := flag.String("db", "local-action.db", "path to sqlite database file")
@@ -40,7 +46,7 @@ func main() {
 	engine := runs.NewEngine(db, key, *actBin, hub.Broadcast, hub.Forget)
 	term := terminal.NewManager()
 
-	mux := httpapi.NewRouter(db, key, engine, hub, term, *actBin)
+	mux := httpapi.NewRouter(db, key, engine, hub, term, *actBin, version)
 
 	staticFS, err := fs.Sub(web.Dist, "dist")
 	if err != nil {

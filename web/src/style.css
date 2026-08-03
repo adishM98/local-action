@@ -247,7 +247,34 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 }
 .repo-header__recent-menu button:hover { background: var(--panel-2); }
 
-.health { display: flex; gap: 4px; }
+.health { display: flex; align-items: center; gap: 4px; }
+.update-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: color-mix(in srgb, var(--blue) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--blue) 35%, transparent);
+  border-radius: 999px;
+  padding: 4px 8px 4px 10px;
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.update-banner:hover { border-color: var(--blue); }
+.update-banner__dismiss {
+  display: flex;
+  align-items: center;
+  background: none;
+  border: none;
+  color: inherit;
+  opacity: 0.7;
+  padding: 2px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.update-banner__dismiss:hover { opacity: 1; background: color-mix(in srgb, var(--blue) 20%, transparent); }
 .health__item {
   display: flex;
   align-items: center;

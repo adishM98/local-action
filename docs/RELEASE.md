@@ -39,8 +39,9 @@ make package-macos-app VERSION=0.1.0
 This runs `scripts/package-macos-app.sh`, which:
 
 1. Builds `cmd/local-action-gui` for **arm64 only** — it needs `CGO_ENABLED=1` (links against WebKit/Cocoa for the embedded window), unlike the plain binary's pure cross-compile. Intel support is possible (Apple's SDK ships universal framework stubs, so cross-compiling cgo via `CC="clang -arch x86_64"` mostly works) but isn't verified here since it can't be tested without an actual Intel Mac — add it if you need it.
-2. Generates `icon.icns` from `assets/logo-1024.png` via `scripts/flatten-icon.swift`. Two things it has to do that a naive flatten wouldn't: bake in the rounded corners (macOS does **not** auto-round a plain custom `.icns` for an unsigned/local-built app — without this it renders as a hard-cornered square next to every other app's rounded tile), and inset the black square to ~85% of the canvas with the logo scaled/centered on its actual visible content, not the source image's own (uneven) padding — full-bleed reads as oversized next to properly-templated icons like Spotify's.
-3. Assembles `build/LocalAction.app` and wraps it in a drag-to-install DMG (`hdiutil`, built into macOS — no `create-dmg` dependency).
+2. Downloads a pinned `act` release (`ACT_VERSION` at the top of the script) and bundles it into `Contents/Resources/act-bin/`, checksum-verified against `ACT_SHA256`. A real user hit `act: executable file not found in $PATH` because they'd never installed `act` separately — a double-clicked app shouldn't need that. `cmd/local-action-gui` prefers this bundled copy over `PATH` (see `resolveActBin` in `main.go`); the plain CLI binary is unaffected and still requires `act` on `PATH` (Homebrew installs it as a formula dependency). Bumping the bundled version is a deliberate, manual edit to the two constants — not automatic.
+3. Generates `icon.icns` from `assets/logo-1024.png` via `scripts/flatten-icon.swift`. Two things it has to do that a naive flatten wouldn't: bake in the rounded corners (macOS does **not** auto-round a plain custom `.icns` for an unsigned/local-built app — without this it renders as a hard-cornered square next to every other app's rounded tile), and inset the black square to ~85% of the canvas with the logo scaled/centered on its actual visible content, not the source image's own (uneven) padding — full-bleed reads as oversized next to properly-templated icons like Spotify's.
+4. Assembles `build/LocalAction.app` and wraps it in a drag-to-install DMG (`hdiutil`, built into macOS — no `create-dmg` dependency).
 
 Output: `build/local-action_0.1.0_darwin_arm64.dmg`.
 
@@ -118,7 +119,7 @@ curl -L -o local-action.dmg https://github.com/adishM98/local-action/releases/la
 open local-action.dmg
 ```
 
-Open the DMG, drag `LocalAction.app` to Applications, launch it. Docker still needs to be installed and running separately — the app looks for `act` on `PATH` and falls back to common Homebrew install locations (`/opt/homebrew/bin`, `/usr/local/bin`) since a Finder-launched app gets a minimal `PATH` that often doesn't include it.
+Open the DMG, drag `LocalAction.app` to Applications, launch it. `act` ships bundled inside the app — nothing to install for it. Docker still needs to be installed and running separately (can't bundle a whole daemon/VM); the health check looks for `docker` on `PATH` and falls back to common Homebrew install locations (`/opt/homebrew/bin`, `/usr/local/bin`) since a Finder-launched app gets a minimal `PATH` that often doesn't include it.
 
 **Homebrew (plain binary, terminal):**
 

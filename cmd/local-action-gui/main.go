@@ -28,6 +28,12 @@ import (
 
 const addr = "127.0.0.1:8090"
 
+// version is set at build time via -ldflags "-X main.version=X.Y.Z" (see
+// scripts/package-macos-app.sh) — "dev" for a plain `go build`, which
+// internal/update treats as "never has an update" rather than comparing
+// against a meaningless placeholder.
+var version = "dev"
+
 // Cocoa requires all UI work happen on the process's original OS thread.
 // Go's scheduler can otherwise migrate main() off it, silently breaking
 // NSApplication (the process runs, the server answers, but no window or
@@ -111,10 +117,11 @@ func startServer(dataDir string) bool {
 	}
 
 	hub := ws.NewHub()
-	engine := runs.NewEngine(database, key, "act", hub.Broadcast, hub.Forget)
+	actBin := resolveActBin()
+	engine := runs.NewEngine(database, key, actBin, hub.Broadcast, hub.Forget)
 	term := terminal.NewManager()
 
-	mux := httpapi.NewRouter(database, key, engine, hub, term, "act")
+	mux := httpapi.NewRouter(database, key, engine, hub, term, actBin, version)
 
 	staticFS, err := fs.Sub(web.Dist, "dist")
 	if err != nil {
@@ -129,13 +136,31 @@ func startServer(dataDir string) bool {
 	return true
 }
 
+// resolveActBin prefers the act binary bundled in the app itself
+// (Contents/Resources/act-bin/act, put there by scripts/package-macos-app.sh)
+// over whatever's on PATH — a real user hit "act: executable file not
+// found in $PATH" because they'd never installed act separately, which
+// the DMG app shouldn't require at all when it can just ship its own copy.
+// Falls back to plain "act" (PATH lookup, same as before) when running
+// outside a real .app bundle, e.g. via `go run` in development.
+func resolveActBin() string {
+	exe, err := os.Executable()
+	if err != nil {
+		return "act"
+	}
+	bundled := filepath.Join(filepath.Dir(exe), "..", "Resources", "act-bin", "act")
+	if info, err := os.Stat(bundled); err == nil && !info.IsDir() {
+		return bundled
+	}
+	return "act"
+}
+
 // fixPATH prepends common Homebrew/Docker install locations to PATH. A
 // Finder-launched app gets a minimal PATH (no .zshrc/.bash_profile
-// sourced) that's missing wherever `act`, `docker`, etc. actually live —
-// they work fine from a Terminal-launched CLI but are invisible here
-// otherwise. Fixing PATH once, up front, covers every exec.Command call
-// in the process (act invocations, the Docker health check, git) instead
-// of resolving each binary's location separately.
+// sourced) that's missing wherever Docker etc. actually live — they work
+// fine from a Terminal-launched CLI but are invisible here otherwise.
+// act itself no longer depends on this (see resolveActBin above), but the
+// Docker health check and git both still shell out by bare name.
 func fixPATH() {
 	path := os.Getenv("PATH")
 	for _, dir := range []string{"/opt/homebrew/bin", "/usr/local/bin"} {

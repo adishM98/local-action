@@ -17,6 +17,7 @@ import (
 	"local-action/internal/runs"
 	"local-action/internal/secrets"
 	"local-action/internal/terminal"
+	"local-action/internal/update"
 	"local-action/internal/workflows"
 	"local-action/internal/ws"
 )
@@ -31,8 +32,14 @@ func readJSON(r *http.Request, v any) error {
 	return json.NewDecoder(r.Body).Decode(v)
 }
 
-func NewRouter(db *sql.DB, key []byte, engine *runs.Engine, hub *ws.Hub, term *terminal.Manager, actBin string) *http.ServeMux {
+func NewRouter(db *sql.DB, key []byte, engine *runs.Engine, hub *ws.Hub, term *terminal.Manager, actBin, version string) *http.ServeMux {
 	mux := http.NewServeMux()
+
+	mux.HandleFunc("GET /api/update-check", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+		writeJSON(w, http.StatusOK, update.Check(ctx, version))
+	})
 
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)

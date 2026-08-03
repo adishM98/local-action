@@ -27,7 +27,7 @@ curl -L -o local-action.dmg https://github.com/adishM98/local-action/releases/la
 open local-action.dmg
 ```
 
-Needs Docker running, and [`act`](https://github.com/nektos/act) installed (`brew install act`, or `make bootstrap` from a cloned checkout) — the app looks on `PATH` first, then common Homebrew locations.
+`act` ships bundled inside the app — nothing to install for it. Just needs Docker running.
 
 Unsigned (no Apple Developer ID yet) — first launch will warn "Apple could not verify..."; right-click → Open once to bypass it.
 
@@ -149,6 +149,7 @@ internal/
   runs/                 run history/log storage, act invocation engine (FIFO queue)
   ws/                   WebSocket log-streaming hub for run output
   terminal/             pty-backed shell sessions behind the in-app terminal panel
+  update/               checks GitHub releases for a newer version (check-only, never installs)
   httpapi/              HTTP route wiring
 assets/                 source logo assets used to generate the DMG app's Dock icon
 testdata/sample-repo/   a real workflow file, for manual end-to-end testing

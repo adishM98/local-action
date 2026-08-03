@@ -37,4 +37,5 @@ export const api = {
   listTerminalSessions: (repoPath) =>
     request('GET', `/api/terminal/sessions?repoPath=${encodeURIComponent(repoPath)}`),
   killTerminalSession: (id) => request('DELETE', `/api/terminal/sessions/${id}`),
+  checkForUpdate: () => request('GET', '/api/update-check'),
 }

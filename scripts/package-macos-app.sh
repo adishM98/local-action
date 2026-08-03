@@ -17,6 +17,13 @@ if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   exit 1
 fi
 
+# act release to bundle — pinned, not "latest", so the app's behavior is
+# reproducible across builds. Bump deliberately when there's a reason to
+# (e.g. a real workflow that needs a newer act feature/fix); see
+# https://github.com/nektos/act/releases for what's available.
+ACT_VERSION="0.2.89"
+ACT_SHA256="48ae218af96725f7635a66de2b87e1e346893b02add0f16b92f560296b2151fc"
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
@@ -32,7 +39,23 @@ echo "==> Building frontend"
 (cd web && npm install && npm run build)
 
 echo "==> Building local-action-gui (arm64, cgo enabled for the native webview)"
-GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 go build -o "$CONTENTS/MacOS/local-action-gui" ./cmd/local-action-gui
+GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 go build -ldflags "-X main.version=$VERSION" -o "$CONTENTS/MacOS/local-action-gui" ./cmd/local-action-gui
+
+echo "==> Bundling act ${ACT_VERSION} (Contents/Resources/act-bin) — a real user hit"
+echo "    'act: executable file not found in \$PATH' because they'd never installed"
+echo "    act separately, which a double-clicked app shouldn't require at all."
+ACT_DIR="$CONTENTS/Resources/act-bin"
+rm -rf "$ACT_DIR"
+mkdir -p "$ACT_DIR"
+ACT_TARBALL="$BUILD_DIR/act_darwin_arm64.tar.gz"
+curl -sL -o "$ACT_TARBALL" "https://github.com/nektos/act/releases/download/v${ACT_VERSION}/act_Darwin_arm64.tar.gz"
+echo "${ACT_SHA256}  ${ACT_TARBALL}" | shasum -a 256 -c - >/dev/null || {
+  echo "act download checksum mismatch — aborting, not bundling an unverified binary" >&2
+  exit 1
+}
+tar -xzf "$ACT_TARBALL" -C "$ACT_DIR" act LICENSE
+chmod +x "$ACT_DIR/act"
+rm -f "$ACT_TARBALL"
 
 echo "==> Generating icon.icns from assets/logo-1024.png"
 # The plain logo has a transparent background — fine on a web page, but a
@@ -101,9 +124,10 @@ cp "$DMG_PATH" "$UNVERSIONED_DMG"
 
 echo
 echo "==> Done"
-echo "    App:  $APP_DIR"
-echo "    DMG:  $DMG_PATH  ($(shasum -a 256 "$DMG_PATH" | awk '{print $1}'))"
-echo "          $UNVERSIONED_DMG (identical, stable filename for the 'latest' download link)"
+echo "    App:   $APP_DIR"
+echo "    act:   bundled, v${ACT_VERSION} (Contents/Resources/act-bin) — no separate act install needed"
+echo "    DMG:   $DMG_PATH  ($(shasum -a 256 "$DMG_PATH" | awk '{print $1}'))"
+echo "           $UNVERSIONED_DMG (identical, stable filename for the 'latest' download link)"
 echo
 echo "No Apple Developer ID yet — this DMG is unsigned. Anyone downloading it"
 echo "via a browser will hit Gatekeeper's \"unidentified developer\" warning"

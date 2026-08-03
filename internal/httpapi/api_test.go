@@ -32,7 +32,7 @@ func newTestRouter(t *testing.T, actStub string) (*http.ServeMux, *sql.DB, strin
 	key := make([]byte, secrets.KeySize)
 	hub := ws.NewHub()
 	engine := runs.NewEngine(db, key, actStub, hub.Broadcast, hub.Forget)
-	return NewRouter(db, key, engine, hub, terminal.NewManager(), actStub), db, dir
+	return NewRouter(db, key, engine, hub, terminal.NewManager(), actStub, "0.1.0"), db, dir
 }
 
 func TestAPI_ScanSecretsAndRunLifecycle(t *testing.T) {

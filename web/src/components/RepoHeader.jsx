@@ -1,9 +1,28 @@
 import { useEffect, useState } from 'react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { Sun, Moon, Monitor, Check } from 'lucide-react'
+import { Sun, Moon, Monitor, Check, ArrowUpCircle, X } from 'lucide-react'
 import HealthItem from './HealthItem.jsx'
+import { api } from '../api.js'
 
 const THEME_KEY = 'theme'
+const DISMISSED_UPDATE_KEY = 'dismissedUpdateVersion'
+
+// Checked once per page load — this is a nice-to-have notice, not something
+// that needs to poll. api.checkForUpdate() itself never throws for network
+// failures (see internal/update), so no try/catch needed here either.
+function useUpdateInfo() {
+  const [info, setInfo] = useState(null)
+  useEffect(() => {
+    api.checkForUpdate().then(setInfo).catch(() => {})
+  }, [])
+  const dismissedVersion = localStorage.getItem(DISMISSED_UPDATE_KEY)
+  const visible = Boolean(info?.updateAvailable) && info.latestVersion !== dismissedVersion
+  function dismiss() {
+    if (info?.latestVersion) localStorage.setItem(DISMISSED_UPDATE_KEY, info.latestVersion)
+    setInfo(null)
+  }
+  return { info, visible, dismiss }
+}
 
 const THEME_MODES = [
   { key: 'system', label: 'System', icon: Monitor },
@@ -57,6 +76,7 @@ function useTheme() {
 export default function RepoHeader({ health, onRecheck, onNavigate }) {
   const [mode, effective, setMode] = useTheme()
   const ThemeIcon = effective === 'light' ? Sun : Moon
+  const { info: updateInfo, visible: showUpdateBanner, dismiss: dismissUpdate } = useUpdateInfo()
 
   return (
     <header className="repo-header">
@@ -70,6 +90,30 @@ export default function RepoHeader({ health, onRecheck, onNavigate }) {
         </span>
       </button>
       <div className="health">
+        {showUpdateBanner && (
+          <a
+            className="update-banner"
+            href={updateInfo.releaseUrl}
+            target="_blank"
+            rel="noreferrer"
+            title={`local-action v${updateInfo.latestVersion} is available`}
+          >
+            <ArrowUpCircle size={13} />
+            v{updateInfo.latestVersion} available
+            <button
+              type="button"
+              className="update-banner__dismiss"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                dismissUpdate()
+              }}
+              title="Dismiss"
+            >
+              <X size={12} />
+            </button>
+          </a>
+        )}
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
             <button className="health__item" title={`Theme: ${mode}`}>
