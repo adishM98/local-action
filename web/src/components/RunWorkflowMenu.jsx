@@ -2,6 +2,18 @@ import { useEffect, useState } from 'react'
 import * as Popover from '@radix-ui/react-popover'
 import { api } from '../api.js'
 
+// Inverse of the payload the label dropdown builds — recovers the
+// previously-picked label (or '' for "None") from a saved payload so
+// reopening the menu shows the same selection instead of resetting it.
+function labelFromPayload(jsonStr) {
+  if (!jsonStr) return ''
+  try {
+    return JSON.parse(jsonStr)?.pull_request?.labels?.[0]?.name || ''
+  } catch {
+    return ''
+  }
+}
+
 export default function RunWorkflowMenu({ repoPath, workflow, onStarted, onOpenSecrets }) {
   const [open, setOpen] = useState(false)
   const [event, setEvent] = useState(workflow.events?.[0] || '')
@@ -11,6 +23,7 @@ export default function RunWorkflowMenu({ repoPath, workflow, onStarted, onOpenS
   const [starting, setStarting] = useState(false)
   const [payload, setPayload] = useState('')
   const [payloadError, setPayloadError] = useState(null)
+  const [selectedLabel, setSelectedLabel] = useState('')
 
   useEffect(() => {
     if (!open) return
@@ -35,6 +48,12 @@ export default function RunWorkflowMenu({ repoPath, workflow, onStarted, onOpenS
   const needsManualPayload = workflow.needsEventPayload && !autoPayload
 
   const suggested = workflow.suggestedEventPayload || ''
+  const suggestedLabels = workflow.suggestedLabels || []
+  // When the if: condition is purely a set of PR-label checks, offer a
+  // dropdown instead of a raw JSON field — most people testing a
+  // label-gated job want "run with label X" or "confirm it skips with
+  // none", not to hand-write {"pull_request":{"labels":[...]}}.
+  const useLabelDropdown = needsManualPayload && suggestedLabels.length > 0
 
   useEffect(() => {
     if (!open || !needsManualPayload) return
@@ -43,13 +62,25 @@ export default function RunWorkflowMenu({ repoPath, workflow, onStarted, onOpenS
     // shown only as a placeholder hint, not real content).
     api
       .getEventPayload(repoPath, workflow.file)
-      .then((result) => setPayload(result?.payload || suggested))
-      .catch(() => setPayload(suggested))
-  }, [open, repoPath, workflow.file, needsManualPayload, suggested])
+      .then((result) => {
+        if (useLabelDropdown) {
+          setSelectedLabel(labelFromPayload(result?.payload))
+        } else {
+          setPayload(result?.payload || suggested)
+        }
+      })
+      .catch(() => {
+        if (!useLabelDropdown) setPayload(suggested)
+      })
+  }, [open, repoPath, workflow.file, needsManualPayload, useLabelDropdown, suggested])
 
   async function run() {
-    const manual = needsManualPayload ? payload.trim() : ''
-    if (needsManualPayload && manual) {
+    const manual = needsManualPayload
+      ? useLabelDropdown
+        ? JSON.stringify({ pull_request: { labels: selectedLabel ? [{ name: selectedLabel }] : [] } })
+        : payload.trim()
+      : ''
+    if (needsManualPayload && !useLabelDropdown && manual) {
       try {
         JSON.parse(manual)
       } catch {
@@ -133,7 +164,24 @@ export default function RunWorkflowMenu({ repoPath, workflow, onStarted, onOpenS
               {input.description && <small>{input.description}</small>}
             </label>
           ))}
-          {needsManualPayload && (
+          {useLabelDropdown && (
+            <label className="field">
+              <span>Label to test</span>
+              <select value={selectedLabel} onChange={(e) => setSelectedLabel(e.target.value)}>
+                <option value="">None — no matching label</option>
+                {suggestedLabels.map((label) => (
+                  <option key={label} value={label}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <small>
+                This workflow's <code>if:</code> condition checks for these PR labels — pick one to run as if the PR had
+                just that label, or "None" to confirm the job correctly skips when nothing matches.
+              </small>
+            </label>
+          )}
+          {needsManualPayload && !useLabelDropdown && (
             <label className="field">
               <span>
                 Event payload (JSON)

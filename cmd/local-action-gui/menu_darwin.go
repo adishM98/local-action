@@ -17,6 +17,13 @@ package main
 void installEditMenu(void) {
     @autoreleasepool {
         NSApplication *app = [NSApplication sharedApplication];
+        // Belt-and-suspenders for a hand-built app with no nib/storyboard:
+        // make sure it's unambiguously a regular foreground app. Modal
+        // panels (NSOpenPanel included) expect this — an app that isn't
+        // properly active can have a modal session start without the
+        // panel ever actually becoming key/visible.
+        [app setActivationPolicy:NSApplicationActivationPolicyRegular];
+        [app activateIgnoringOtherApps:YES];
 
         NSMenu *menuBar = [app mainMenu];
         if (menuBar == nil) {

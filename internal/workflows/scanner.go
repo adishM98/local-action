@@ -34,6 +34,15 @@ type WorkflowInfo struct {
 	// clauses it found regardless of &&/||, so the user still needs to
 	// check it.
 	SuggestedEventPayload string `json:"suggestedEventPayload,omitempty"`
+	// SuggestedLabels lists the PR label values (deduped, first-seen order)
+	// this workflow's if: conditions check for via the
+	// contains(github.event.pull_request.labels.*.name, 'x') idiom — set
+	// only when that idiom is the SOLE recognized pattern across every job
+	// (see collectSuggestedLabels). The frontend uses this to offer a
+	// "pick a label" dropdown instead of the raw JSON payload field; a
+	// workflow whose condition mixes label checks with anything else falls
+	// back to the general JSON field, same as before this field existed.
+	SuggestedLabels []string `json:"suggestedLabels,omitempty"`
 	// IncompatibleRunners lists any runs-on labels (deduped, sorted) that
 	// act cannot actually honor: act only ever runs Linux containers, so
 	// windows-*/macos-*/self-hosted labels silently either fail or fall
@@ -195,6 +204,7 @@ func ParseWorkflowFile(path string) (WorkflowInfo, error) {
 
 	if jobsNode != nil {
 		info.AutoEventPayload, info.SuggestedEventPayload, info.NeedsEventPayload = autoEventPayloadFromJobs(jobsNode)
+		info.SuggestedLabels = collectSuggestedLabels(jobsNode)
 		info.IncompatibleRunners = incompatibleRunners(jobsNode)
 	}
 
@@ -306,6 +316,66 @@ func autoEventPayloadFromJobs(jobsNode *yaml.Node) (payload, suggested string, n
 		return string(b), "", true
 	}
 	return "", string(b), true
+}
+
+// collectSuggestedLabels scans every job's if: condition for the
+// contains(github.event.pull_request.labels.*.name, 'x') idiom and returns
+// the deduped label values in first-seen order — but only when that idiom
+// is the ONLY recognized pattern anywhere in the workflow. A single other
+// clause (a plain github.event.<path> == 'value' check, or a contains()
+// over some other array/leaf) means a label pick alone wouldn't fully
+// determine a coherent payload, so it returns nil and the caller falls back
+// to the general JSON payload field instead.
+func collectSuggestedLabels(jobsNode *yaml.Node) []string {
+	if jobsNode.Kind != yaml.MappingNode {
+		return nil
+	}
+
+	var labels []string
+	seen := map[string]bool{}
+	sawOther := false
+
+	for i := 0; i < len(jobsNode.Content); i += 2 {
+		jobNode := jobsNode.Content[i+1]
+		if jobNode.Kind != yaml.MappingNode {
+			continue
+		}
+		for j := 0; j < len(jobNode.Content); j += 2 {
+			if jobNode.Content[j].Value != "if" {
+				continue
+			}
+			ifValue := jobNode.Content[j+1]
+			if ifValue.Kind != yaml.ScalarNode {
+				continue
+			}
+			cond := ifValue.Value
+			if !githubEventRe.MatchString(cond) {
+				continue
+			}
+			if len(ifClauseRe.FindAllStringSubmatch(cond, -1)) > 0 {
+				sawOther = true
+			}
+			for _, m := range containsLabelRe.FindAllStringSubmatch(cond, -1) {
+				if m[1] != "pull_request.labels" || m[2] != "name" {
+					sawOther = true
+					continue
+				}
+				value := m[3]
+				if value == "" && m[4] != "" {
+					value = m[4]
+				}
+				if !seen[value] {
+					seen[value] = true
+					labels = append(labels, value)
+				}
+			}
+		}
+	}
+
+	if sawOther || len(labels) == 0 {
+		return nil
+	}
+	return labels
 }
 
 // solveIfCondition fully solves cond only when it's a plain conjunction

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Star, Layers, Loader2, XCircle, CheckCircle2, AlertTriangle, Package, GitBranch, Pencil } from 'lucide-react'
+import { Star, Layers, Loader2, XCircle, CheckCircle2, AlertTriangle, Package, GitBranch, Pencil, FolderOpen, Clock } from 'lucide-react'
 import StatusIcon, { StatusCircle } from './StatusIcon.jsx'
 import {
   computeRunStats,
@@ -27,6 +27,7 @@ function rememberPath(path) {
 export default function Overview({ repoPath, onCommit, branch, workflows, runs, onOpenRun, onNavigate }) {
   const [editing, setEditing] = useState(!repoPath)
   const [draft, setDraft] = useState(repoPath)
+  const [showRecent, setShowRecent] = useState(false)
   const recentPaths = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]')
 
   useEffect(() => {
@@ -34,11 +35,59 @@ export default function Overview({ repoPath, onCommit, branch, workflows, runs, 
     setEditing(!repoPath)
   }, [repoPath])
 
+  useEffect(() => {
+    if (!showRecent) return
+    function onClickOutside(e) {
+      if (!e.target.closest('.repo-header__recent-wrap')) setShowRecent(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [showRecent])
+
   function commitPath() {
     const path = draft.trim()
     // Nothing to commit — stay in editing mode instead of stranding a
     // first-time user on a screen with no visible input and no repo name.
     if (!path) return
+    setEditing(false)
+    if (path !== repoPath) {
+      rememberPath(path)
+      onCommit(path)
+    }
+  }
+
+  // window.pickRepoFolder is bound natively by the DMG app (cmd/local-action-gui)
+  // and opens a real macOS folder picker — a regular browser tab has no way
+  // to expose a real filesystem path to JS at all, so the button simply
+  // doesn't render there instead of pretending to work.
+  const hasNativeFolderPicker = typeof window.pickRepoFolder === 'function'
+
+  async function browseFolder() {
+    let path
+    try {
+      path = await window.pickRepoFolder()
+    } catch (err) {
+      // A failure here would otherwise vanish silently (no visible error,
+      // no popup) — log it so it's at least diagnosable from the app's
+      // console/log file instead of just looking like nothing happened.
+      console.error('pickRepoFolder failed:', err)
+      return
+    }
+    if (!path) return
+    setDraft(path)
+    setEditing(false)
+    if (path !== repoPath) {
+      rememberPath(path)
+      onCommit(path)
+    }
+  }
+
+  // The browser-side equivalent of browseFolder — no real filesystem
+  // access is possible from a browser tab, so this picks from paths
+  // already used before rather than pretending to browse the disk.
+  function pickRecent(path) {
+    setShowRecent(false)
+    setDraft(path)
     setEditing(false)
     if (path !== repoPath) {
       rememberPath(path)
@@ -98,6 +147,51 @@ export default function Overview({ repoPath, onCommit, branch, workflows, runs, 
                   <option key={p} value={p} />
                 ))}
               </datalist>
+              {hasNativeFolderPicker ? (
+                <button
+                  type="button"
+                  className="repo-header__browse"
+                  // Clicking this button would otherwise blur the input
+                  // first, and commitPath's blur handler unconditionally
+                  // exits editing mode — collapsing this whole block
+                  // before the click (and the folder pick it starts)
+                  // even runs. Preventing the mousedown default stops the
+                  // focus shift, so no blur fires at all.
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={browseFolder}
+                  title="Browse for a folder"
+                >
+                  <FolderOpen size={15} />
+                </button>
+              ) : (
+                recentPaths.length > 0 && (
+                  <div className="repo-header__recent-wrap">
+                    <button
+                      type="button"
+                      className="repo-header__browse"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => setShowRecent((s) => !s)}
+                      title="Recent repo paths"
+                    >
+                      <Clock size={15} />
+                    </button>
+                    {showRecent && (
+                      <div className="repo-header__recent-menu">
+                        {recentPaths.map((p) => (
+                          <button
+                            key={p}
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => pickRecent(p)}
+                          >
+                            {p}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              )}
             </div>
           ) : (
             <div className="overview__identity-text">

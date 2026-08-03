@@ -183,7 +183,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 .repo-header__meta-path { font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; }
 .repo-header__meta-edit { flex-shrink: 0; margin-left: 2px; opacity: 0.6; transition: opacity 150ms ease; }
 
-.repo-header__path-wrap { flex: 1; position: relative; display: flex; }
+.repo-header__path-wrap { flex: 1; display: flex; align-items: center; gap: 6px; }
 .repo-header__path-input {
   flex: 1;
   background: var(--panel-2);
@@ -197,6 +197,55 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 }
 .repo-header__path-input:focus { outline: none; border-color: var(--text); }
 .repo-header__path-input::placeholder { color: var(--muted); }
+.repo-header__browse {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.repo-header__browse:hover { color: var(--text); border-color: var(--muted); }
+
+.repo-header__recent-wrap { position: relative; }
+.repo-header__recent-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 10;
+  min-width: 260px;
+  max-width: 420px;
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+.repo-header__recent-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.repo-header__recent-menu button:hover { background: var(--panel-2); }
 
 .health { display: flex; gap: 4px; }
 .health__item {
@@ -754,6 +803,18 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   color: var(--text);
   padding: 5px 10px;
   font-size: 13px;
+}
+/* WebKit (the DMG app's embedded webview) renders <select> as a glossy
+   native Aqua control and ignores most of its box styling unless appearance
+   is explicitly reset — Chrome doesn't have this quirk, which is why this
+   looked fine in every browser-based check but not in the actual app. */
+.field select, .field-row select, .secrets-page select, .toolbar select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 28px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23a1a1aa' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
 }
 .field input.field__checkbox {
   width: 16px;

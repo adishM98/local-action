@@ -736,3 +736,82 @@ func TestScanWorkflows_EmptyResultsMarshalAsEmptyArray(t *testing.T) {
 		t.Fatalf("empty-dir case: expected [], got %s", b)
 	}
 }
+
+// TestParseWorkflowFile_SuggestedLabelsAcrossClausesAndJobs is the same
+// shape as TestParseWorkflowFile_SuggestsAllLabelsAcrossClausesAndJobs — a
+// pure label-only condition, ||-joined within a job and split across two
+// jobs — but asserting SuggestedLabels, the dropdown-driving field, rather
+// than the merged JSON payload.
+func TestParseWorkflowFile_SuggestedLabelsAcrossClausesAndJobs(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", `name: CI
+on: pull_request_target
+jobs:
+  build:
+    if: |
+      contains(github.event.pull_request.labels.*.name, 'run-cypress') ||
+      contains(github.event.pull_request.labels.*.name, 'run-cypress-ce')
+    runs-on: ubuntu-latest
+    steps: []
+  deploy:
+    if: |
+      contains(github.event.pull_request.labels.*.name, 'run-cypress-ce-deployments') ||
+      contains(github.event.pull_request.labels.*.name, 'run-cypress-ee-deployments')
+    runs-on: ubuntu-latest
+    steps: []
+`)
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	want := []string{"run-cypress", "run-cypress-ce", "run-cypress-ce-deployments", "run-cypress-ee-deployments"}
+	if !reflect.DeepEqual(workflows[0].SuggestedLabels, want) {
+		t.Errorf("SuggestedLabels: got %v, want %v", workflows[0].SuggestedLabels, want)
+	}
+}
+
+// TestParseWorkflowFile_NoSuggestedLabelsWhenConditionMixesOtherChecks
+// guards the dropdown's correctness: if a condition needs more than just a
+// label to be true (e.g. also checks the action), picking a label alone
+// wouldn't produce a coherent payload, so this must fall back to nil (and
+// the frontend to the general JSON field) rather than offer a dropdown that
+// silently drops the other requirement.
+func TestParseWorkflowFile_NoSuggestedLabelsWhenConditionMixesOtherChecks(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", `name: CI
+on: pull_request_target
+jobs:
+  build:
+    if: github.event.action == 'labeled' || contains(github.event.pull_request.labels.*.name, 'run-ci')
+    runs-on: ubuntu-latest
+    steps: []
+`)
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	if workflows[0].SuggestedLabels != nil {
+		t.Errorf("expected nil SuggestedLabels for a mixed condition, got %v", workflows[0].SuggestedLabels)
+	}
+}
+
+// TestParseWorkflowFile_NoSuggestedLabelsWhenNoLabelCheck guards against
+// collectSuggestedLabels firing on workflows that don't check labels at all.
+func TestParseWorkflowFile_NoSuggestedLabelsWhenNoLabelCheck(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", `name: CI
+on: pull_request
+jobs:
+  build:
+    if: github.event.action == 'opened'
+    runs-on: ubuntu-latest
+    steps: []
+`)
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	if workflows[0].SuggestedLabels != nil {
+		t.Errorf("expected nil SuggestedLabels, got %v", workflows[0].SuggestedLabels)
+	}
+}

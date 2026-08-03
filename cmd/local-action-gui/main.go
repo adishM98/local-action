@@ -61,6 +61,17 @@ func main() {
 	w := webview.New(false)
 	defer w.Destroy()
 	installEditMenu()
+	// Bind's callback already runs synchronously on the main thread (per
+	// webview_go's own Cocoa backend — the JS message handler that invokes
+	// it is called directly, no dispatch involved), so pickFolder can just
+	// call NSOpenPanel's runModal directly here. Do NOT route this through
+	// w.Dispatch(): dispatching to the main queue and then blocking this
+	// same main thread waiting for that dispatched job is a deadlock — the
+	// queued job can never run because the thread that would run it is the
+	// one stuck waiting on it.
+	if err := w.Bind("pickRepoFolder", pickFolder); err != nil {
+		log.Printf("bind pickRepoFolder: %v", err)
+	}
 	w.SetTitle("local-action")
 	w.SetSize(1280, 800, webview.HintNone)
 	w.Navigate("http://" + addr)
