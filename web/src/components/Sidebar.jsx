@@ -4,6 +4,7 @@ import {
   KeyRound,
   Search,
   ChevronDown,
+  ChevronRight,
   Star,
   MoreHorizontal,
   PanelLeftClose,
@@ -269,7 +270,9 @@ export default function Sidebar({ repoPath, workflows, scanState, scanning, onRe
                 onClick={() => setCollapsed((c) => ({ ...c, [category]: !c[category] }))}
                 aria-expanded={!isCollapsed}
               >
-                <span className="sidebar__group-chevron">{isCollapsed ? '▸' : '▾'}</span>
+                <span className="sidebar__group-chevron">
+                  {isCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+                </span>
                 <span className="sidebar__group-icon">
                   <Icon size={13} />
                 </span>
