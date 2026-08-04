@@ -67,10 +67,21 @@ type WorkflowInfo struct {
 // job's key appears in the workflow file, used to locate its YAML block
 // when the frontend points at the source for a failed job.
 type JobInfo struct {
-	ID    string   `json:"id"`
-	Name  string   `json:"name"`
-	Needs []string `json:"needs,omitempty"`
-	Line  int      `json:"line,omitempty"`
+	ID    string     `json:"id"`
+	Name  string     `json:"name"`
+	Needs []string   `json:"needs,omitempty"`
+	Line  int        `json:"line,omitempty"`
+	Steps []StepInfo `json:"steps,omitempty"`
+}
+
+// StepInfo is one step's static position — Name is the step's own `name:`
+// (empty when the step doesn't declare one, e.g. a bare `run:`/`uses:`
+// with no name — act then falls back to a synthesized label the frontend
+// can't reliably match back to source, so those steps only contribute
+// their Line as a boundary for locating neighboring named steps).
+type StepInfo struct {
+	Name string `json:"name,omitempty"`
+	Line int    `json:"line"`
 }
 
 // categoryKeywords is checked in order — more specific categories (Security)
@@ -602,12 +613,38 @@ func parseJobs(jobsNode *yaml.Node) []JobInfo {
 					}
 				case "needs":
 					job.Needs = needsList(jobNode.Content[j+1])
+				case "steps":
+					job.Steps = parseSteps(jobNode.Content[j+1])
 				}
 			}
 		}
 		jobs = append(jobs, job)
 	}
 	return jobs
+}
+
+// parseSteps records each step's declared name (if any) and the line its
+// sequence item starts on — the frontend uses consecutive steps' lines to
+// bound each step's YAML block when highlighting the one that failed.
+func parseSteps(stepsNode *yaml.Node) []StepInfo {
+	if stepsNode == nil || stepsNode.Kind != yaml.SequenceNode {
+		return nil
+	}
+	var steps []StepInfo
+	for _, stepNode := range stepsNode.Content {
+		step := StepInfo{Line: stepNode.Line}
+		if stepNode.Kind == yaml.MappingNode {
+			for j := 0; j < len(stepNode.Content); j += 2 {
+				if stepNode.Content[j].Value == "name" {
+					if v := stepNode.Content[j+1]; v.Kind == yaml.ScalarNode {
+						step.Name = v.Value
+					}
+				}
+			}
+		}
+		steps = append(steps, step)
+	}
+	return steps
 }
 
 // needsList normalizes needs:'s two shapes (a single job id, or a list of

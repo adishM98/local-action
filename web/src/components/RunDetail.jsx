@@ -93,7 +93,14 @@ export default function RunDetail({ runId, workflows, onClose, onOpenRun }) {
   const workflowJobs = workflow?.jobs || []
   const hasGraph = workflowJobs.length > 0
   const runtimeJobsById = useMemo(() => new Map(parsed.jobs.map((j) => [j.id, j])), [parsed.jobs])
-  const failedJobId = parsed.jobs.find((j) => j.result === 'failure')?.id || null
+  const failedJob = parsed.jobs.find((j) => j.result === 'failure')
+  const failedJobId = failedJob?.id || null
+  // act doesn't always mark the step that actually broke the job as
+  // "failure" (see the Docker-build-and-push case that prompted this) — the
+  // step still mid-flight when the job died is the next best signal.
+  const failedStepName = failedJob
+    ? failedJob.steps.find((s) => s.result === 'failure')?.name || failedJob.steps[failedJob.steps.length - 1]?.name || null
+    : null
   const effectiveView = !hasGraph && view === 'graph' ? 'logs' : view
 
   useEffect(() => {
@@ -224,7 +231,12 @@ export default function RunDetail({ runId, workflows, onClose, onOpenRun }) {
         ) : source == null ? (
           <p className="empty-state">Loading source…</p>
         ) : (
-          <WorkflowSource source={source} jobs={workflowJobs} highlightJobId={failedJobId} />
+          <WorkflowSource
+            source={source}
+            jobs={workflowJobs}
+            highlightJobId={failedJobId}
+            highlightStepName={failedStepName}
+          />
         )
       ) : (
         <>

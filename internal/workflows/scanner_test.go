@@ -859,6 +859,39 @@ jobs:
 	}
 }
 
+// TestParseWorkflowFile_StepsCaptureNameAndLine guards the data the
+// frontend's "point at the failed step" highlighting depends on: each
+// step's line (always) and name (only when declared — an unnamed step's
+// line still matters as a boundary for its neighbors, but its name can't
+// be reliably matched back to act's synthesized step label).
+func TestParseWorkflowFile_StepsCaptureNameAndLine(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", `name: CI
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      - run: echo "no name here"
+      - name: Build and Push Docker image
+        run: docker build .
+`)
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	want := []StepInfo{
+		{Name: "Checkout repo", Line: 7},
+		{Line: 9},
+		{Name: "Build and Push Docker image", Line: 10},
+	}
+	if !reflect.DeepEqual(workflows[0].Jobs[0].Steps, want) {
+		t.Errorf("Steps:\ngot  %+v\nwant %+v", workflows[0].Jobs[0].Steps, want)
+	}
+}
+
 // TestParseWorkflowFile_JobsNoNeedsWhenIndependent guards against needs
 // being fabricated for jobs that don't declare it — an independent job
 // (no needs: at all) is a graph root, not (accidentally) dependent on
