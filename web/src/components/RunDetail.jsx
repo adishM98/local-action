@@ -88,7 +88,9 @@ export default function RunDetail({ runId, workflows, onClose, onOpenRun }) {
 
   const parsed = useMemo(() => parseLogLines(lines), [lines])
   const isTerminal = run && TERMINAL.includes(run.status)
-  const workflowJobs = (run && workflows?.find((w) => w.file === run.workflowFile)?.jobs) || []
+  const workflow = run && workflows?.find((w) => w.file === run.workflowFile)
+  const workflowName = workflow?.name || run?.workflowFile
+  const workflowJobs = workflow?.jobs || []
   const hasGraph = workflowJobs.length > 0
   const runtimeJobsById = useMemo(() => new Map(parsed.jobs.map((j) => [j.id, j])), [parsed.jobs])
   const failedJobId = parsed.jobs.find((j) => j.result === 'failure')?.id || null
@@ -154,9 +156,10 @@ export default function RunDetail({ runId, workflows, onClose, onOpenRun }) {
         <div className="run-detail__head-row">
           <StatusBadge status={run?.status} />
           <h2 title={run ? `${run.workflowFile} #${run.id}` : `Run #${runId}`}>
-            {run ? `${run.workflowFile} #${run.id}` : `Run #${runId}`}
+            {run ? `${workflowName} #${run.id}` : `Run #${runId}`}
           </h2>
         </div>
+        {run && <p className="run-detail__file">{run.workflowFile}</p>}
         <div className="run-detail__toolbar">
           {run && (
             <span className="run-detail__meta">
