@@ -40,4 +40,6 @@ export const api = {
     request('GET', `/api/terminal/sessions?repoPath=${encodeURIComponent(repoPath)}`),
   killTerminalSession: (id) => request('DELETE', `/api/terminal/sessions/${id}`),
   checkForUpdate: () => request('GET', '/api/update-check'),
+  getVersionMigration: () => request('GET', '/api/version-migration'),
+  resolveVersionMigration: (action) => request('POST', '/api/version-migration/resolve', { action }),
 }

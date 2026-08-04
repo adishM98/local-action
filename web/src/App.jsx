@@ -8,6 +8,7 @@ import RunDetail from './components/RunDetail.jsx'
 import SecretsPage from './components/SecretsPage.jsx'
 import Drawer from './components/Drawer.jsx'
 import TerminalPanel from './components/TerminalPanel.jsx'
+import VersionMigrationModal from './components/VersionMigrationModal.jsx'
 
 function loadView() {
   try {
@@ -30,6 +31,23 @@ export default function App() {
   const [runs, setRuns] = useState([])
   const [runsError, setRunsError] = useState(null)
   const [branch, setBranch] = useState(null)
+  const [versionMigration, setVersionMigration] = useState(null)
+
+  useEffect(() => {
+    api
+      .getVersionMigration()
+      .then((info) => {
+        if (info.showPrompt) setVersionMigration(info)
+      })
+      .catch(() => {})
+  }, [])
+
+  function resolveVersionMigration(action) {
+    api
+      .resolveVersionMigration(action)
+      .catch(() => {})
+      .finally(() => setVersionMigration(null))
+  }
 
   const checkHealth = useCallback(async () => {
     try {
@@ -182,6 +200,13 @@ export default function App() {
         </Drawer>
       )}
       <TerminalPanel repoPath={repoPath} />
+      {versionMigration && (
+        <VersionMigrationModal
+          previousVersion={versionMigration.previousVersion}
+          currentVersion={versionMigration.currentVersion}
+          onResolve={resolveVersionMigration}
+        />
+      )}
     </div>
   )
 }

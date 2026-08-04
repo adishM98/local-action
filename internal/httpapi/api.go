@@ -14,6 +14,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	appdb "local-action/internal/db"
 	"local-action/internal/runs"
 	"local-action/internal/secrets"
 	"local-action/internal/terminal"
@@ -21,6 +22,8 @@ import (
 	"local-action/internal/workflows"
 	"local-action/internal/ws"
 )
+
+const lastVersionMetaKey = "last_version"
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
@@ -39,6 +42,58 @@ func NewRouter(db *sql.DB, key []byte, engine *runs.Engine, hub *ws.Hub, term *t
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 		writeJSON(w, http.StatusOK, update.Check(ctx, version))
+	})
+
+	// A "dev" build (plain go run/go build, no -ldflags version) never
+	// prompts — there's no meaningful "previous version" to compare against
+	// for a build that isn't a real release.
+	mux.HandleFunc("GET /api/version-migration", func(w http.ResponseWriter, r *http.Request) {
+		previous, err := appdb.GetMeta(db, lastVersionMetaKey)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		showPrompt := version != "dev" && previous != "" && previous != version
+		// Record the baseline as soon as there's nothing to prompt about —
+		// covers the very first launch (previous == "") and every unchanged
+		// reload. When showPrompt is true, leave it unrecorded until
+		// /resolve: that's the signal a fresh version-migration/resolve
+		// call still has a real choice to act on, not just a no-op.
+		if !showPrompt && version != "dev" && previous != version {
+			appdb.SetMeta(db, lastVersionMetaKey, version)
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"previousVersion": previous,
+			"currentVersion":  version,
+			"showPrompt":      showPrompt,
+		})
+	})
+
+	mux.HandleFunc("POST /api/version-migration/resolve", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Action string `json:"action"` // "keep" | "clear"
+		}
+		if err := readJSON(r, &body); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if body.Action == "clear" {
+			if _, err := db.Exec(`DELETE FROM run_logs`); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if _, err := db.Exec(`DELETE FROM runs`); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+		if version != "dev" {
+			if err := appdb.SetMeta(db, lastVersionMetaKey, version); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+		w.WriteHeader(http.StatusNoContent)
 	})
 
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {

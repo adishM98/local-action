@@ -35,6 +35,19 @@ func newTestRouter(t *testing.T, actStub string) (*http.ServeMux, *sql.DB, strin
 	return NewRouter(db, key, engine, hub, terminal.NewManager(), actStub, "0.1.0"), db, dir
 }
 
+func newTestRouterWithVersion(t *testing.T, version string) (*http.ServeMux, *sql.DB) {
+	t.Helper()
+	dir := t.TempDir()
+	database, err := db.OpenDB(filepath.Join(dir, "test.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	key := make([]byte, secrets.KeySize)
+	hub := ws.NewHub()
+	engine := runs.NewEngine(database, key, "act", hub.Broadcast, hub.Forget)
+	return NewRouter(database, key, engine, hub, terminal.NewManager(), "act", version), database
+}
+
 func TestAPI_ScanSecretsAndRunLifecycle(t *testing.T) {
 	repoDir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(repoDir, ".github", "workflows"), 0755); err != nil {
@@ -544,5 +557,135 @@ func runGit(t *testing.T, dir string, args ...string) {
 	cmd.Env = append(cmd.Env, "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t.com", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t.com")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+}
+
+func TestAPI_VersionMigration_FirstLaunchRecordsBaselineNoPrompt(t *testing.T) {
+	mux, database := newTestRouterWithVersion(t, "0.9.0")
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/api/version-migration")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	var got map[string]any
+	json.NewDecoder(resp.Body).Decode(&got)
+	resp.Body.Close()
+	if got["showPrompt"] != false {
+		t.Fatalf("expected no prompt on first launch, got %v", got)
+	}
+
+	last, err := db.GetMeta(database, "last_version")
+	if err != nil {
+		t.Fatalf("get meta: %v", err)
+	}
+	if last != "0.9.0" {
+		t.Fatalf("expected baseline 0.9.0 recorded, got %q", last)
+	}
+}
+
+func TestAPI_VersionMigration_PromptsOnVersionChangeAndClearsOnResolve(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "test.db")
+
+	database, err := db.OpenDB(dbPath)
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	if err := db.SetMeta(database, "last_version", "0.9.0"); err != nil {
+		t.Fatalf("seed last_version: %v", err)
+	}
+	if _, err := runs.CreateRun(database, runs.Run{RepoPath: "/r", WorkflowFile: "ci.yml", Event: "push", Inputs: "{}", Status: runs.StatusSuccess, CreatedAt: time.Now().Unix()}); err != nil {
+		t.Fatalf("seed run: %v", err)
+	}
+	database.Close()
+
+	database, err = db.OpenDB(dbPath)
+	if err != nil {
+		t.Fatalf("reopen db: %v", err)
+	}
+	key := make([]byte, secrets.KeySize)
+	hub := ws.NewHub()
+	engine := runs.NewEngine(database, key, "act", hub.Broadcast, hub.Forget)
+	mux := NewRouter(database, key, engine, hub, terminal.NewManager(), "act", "0.9.1")
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/api/version-migration")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	var got map[string]any
+	json.NewDecoder(resp.Body).Decode(&got)
+	resp.Body.Close()
+	if got["showPrompt"] != true || got["previousVersion"] != "0.9.0" || got["currentVersion"] != "0.9.1" {
+		t.Fatalf("expected a prompt for 0.9.0 -> 0.9.1, got %v", got)
+	}
+
+	// Not yet recorded — resolve hasn't been called.
+	last, _ := db.GetMeta(database, "last_version")
+	if last != "0.9.0" {
+		t.Fatalf("expected last_version still 0.9.0 pending resolve, got %q", last)
+	}
+
+	body, _ := json.Marshal(map[string]string{"action": "clear"})
+	resolveResp, err := http.Post(server.URL+"/api/version-migration/resolve", "application/json", bytes.NewReader(body))
+	if err != nil || resolveResp.StatusCode != http.StatusNoContent {
+		t.Fatalf("resolve: err=%v status=%v", err, resolveResp.StatusCode)
+	}
+
+	last, _ = db.GetMeta(database, "last_version")
+	if last != "0.9.1" {
+		t.Fatalf("expected last_version updated to 0.9.1, got %q", last)
+	}
+
+	runList, err := runs.ListRuns(database, "/r")
+	if err != nil {
+		t.Fatalf("list runs: %v", err)
+	}
+	if len(runList) != 0 {
+		t.Fatalf("expected run history cleared, got %d runs", len(runList))
+	}
+}
+
+func TestAPI_VersionMigration_KeepResolvesWithoutClearingRuns(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "test.db")
+
+	database, err := db.OpenDB(dbPath)
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	if err := db.SetMeta(database, "last_version", "0.9.0"); err != nil {
+		t.Fatalf("seed last_version: %v", err)
+	}
+	if _, err := runs.CreateRun(database, runs.Run{RepoPath: "/r", WorkflowFile: "ci.yml", Event: "push", Inputs: "{}", Status: runs.StatusSuccess, CreatedAt: time.Now().Unix()}); err != nil {
+		t.Fatalf("seed run: %v", err)
+	}
+
+	key := make([]byte, secrets.KeySize)
+	hub := ws.NewHub()
+	engine := runs.NewEngine(database, key, "act", hub.Broadcast, hub.Forget)
+	mux := NewRouter(database, key, engine, hub, terminal.NewManager(), "act", "0.9.1")
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	body, _ := json.Marshal(map[string]string{"action": "keep"})
+	resp, err := http.Post(server.URL+"/api/version-migration/resolve", "application/json", bytes.NewReader(body))
+	if err != nil || resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("resolve: err=%v status=%v", err, resp.StatusCode)
+	}
+
+	runList, err := runs.ListRuns(database, "/r")
+	if err != nil {
+		t.Fatalf("list runs: %v", err)
+	}
+	if len(runList) != 1 {
+		t.Fatalf("expected run history kept, got %d runs", len(runList))
+	}
+	last, _ := db.GetMeta(database, "last_version")
+	if last != "0.9.1" {
+		t.Fatalf("expected last_version updated to 0.9.1, got %q", last)
 	}
 }

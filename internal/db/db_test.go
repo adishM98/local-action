@@ -135,3 +135,39 @@ func TestOpenDB_MigratesOldRunsSchemaAddsBranchAndCommit(t *testing.T) {
 	}
 	db2.Close()
 }
+
+func TestGetSetMeta(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "test.db")
+	db, err := OpenDB(path)
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+
+	v, err := GetMeta(db, "last_version")
+	if err != nil {
+		t.Fatalf("get unset meta: %v", err)
+	}
+	if v != "" {
+		t.Fatalf("expected empty string for unset key, got %q", v)
+	}
+
+	if err := SetMeta(db, "last_version", "0.9.0"); err != nil {
+		t.Fatalf("set meta: %v", err)
+	}
+	v, err = GetMeta(db, "last_version")
+	if err != nil {
+		t.Fatalf("get meta: %v", err)
+	}
+	if v != "0.9.0" {
+		t.Fatalf("expected 0.9.0, got %q", v)
+	}
+
+	if err := SetMeta(db, "last_version", "0.9.1"); err != nil {
+		t.Fatalf("update meta: %v", err)
+	}
+	v, _ = GetMeta(db, "last_version")
+	if v != "0.9.1" {
+		t.Fatalf("expected updated value 0.9.1, got %q", v)
+	}
+}

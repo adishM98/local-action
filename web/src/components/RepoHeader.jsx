@@ -135,6 +135,11 @@ export default function RepoHeader({ health, onRecheck, onNavigate }) {
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
         <HealthItem label="Docker" ok={health?.dockerOK} error={health?.dockerError} onClick={onRecheck} />
+        {updateInfo?.currentVersion && (
+          <span className="app-version" title="Running local-action version">
+            v{updateInfo.currentVersion}
+          </span>
+        )}
       </div>
     </header>
   )

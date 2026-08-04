@@ -50,6 +50,15 @@ CREATE TABLE IF NOT EXISTS workflow_categories (
   category TEXT NOT NULL,
   PRIMARY KEY (repo_path, workflow_file)
 );
+
+-- Generic key/value store for small pieces of app state that aren't
+-- worth a dedicated table — currently just the last version this install
+-- has seen, so a version bump can be detected once and offer a run-history
+-- reset instead of silently carrying old runs forward.
+CREATE TABLE IF NOT EXISTS app_meta (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
 `
 
 func OpenDB(path string) (*sql.DB, error) {
@@ -143,4 +152,24 @@ func migrateSecretsWorkflowFile(db *sql.DB) error {
 		return err
 	}
 	return tx.Commit()
+}
+
+// GetMeta returns "" (not an error) for a key that's never been set — every
+// caller so far treats "unset" and "empty" the same way (e.g. "no version
+// recorded yet, so this must be the very first launch").
+func GetMeta(db *sql.DB, key string) (string, error) {
+	var value string
+	err := db.QueryRow(`SELECT value FROM app_meta WHERE key = ?`, key).Scan(&value)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return value, err
+}
+
+func SetMeta(db *sql.DB, key, value string) error {
+	_, err := db.Exec(
+		`INSERT INTO app_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+		key, value,
+	)
+	return err
 }
