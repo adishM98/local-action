@@ -50,8 +50,24 @@ type WorkflowInfo struct {
 	// Matrix-templated runs-on (e.g. ${{ matrix.os }}) can't be resolved
 	// statically and is skipped rather than guessed at.
 	IncompatibleRunners []string `json:"incompatibleRunners,omitempty"`
-	AutoCategory        string   `json:"autoCategory"`
-	ParseError          string   `json:"parseError,omitempty"`
+	// Jobs describes this workflow's job dependency structure (id, display
+	// name, needs) — the frontend joins this static shape against a run's
+	// live per-job status (already reconstructed from act's JSON log
+	// lines, see web/src/logparse.js) to draw the job graph. Order matches
+	// declaration order in the YAML.
+	Jobs         []JobInfo `json:"jobs,omitempty"`
+	AutoCategory string    `json:"autoCategory"`
+	ParseError   string    `json:"parseError,omitempty"`
+}
+
+// JobInfo is one job's static structure — id is the YAML key (what a
+// sibling job's needs: entry references, and the same identity act's
+// jobID log field uses), name is the human-readable label (defaults to id
+// when the job has no name: of its own).
+type JobInfo struct {
+	ID    string   `json:"id"`
+	Name  string   `json:"name"`
+	Needs []string `json:"needs,omitempty"`
 }
 
 // categoryKeywords is checked in order — more specific categories (Security)
@@ -206,6 +222,7 @@ func ParseWorkflowFile(path string) (WorkflowInfo, error) {
 		info.AutoEventPayload, info.SuggestedEventPayload, info.NeedsEventPayload = autoEventPayloadFromJobs(jobsNode)
 		info.SuggestedLabels = collectSuggestedLabels(jobsNode)
 		info.IncompatibleRunners = incompatibleRunners(jobsNode)
+		info.Jobs = parseJobs(jobsNode)
 	}
 
 	if onNode == nil {
@@ -541,6 +558,52 @@ func incompatibleRunners(jobsNode *yaml.Node) []string {
 	}
 	sort.Strings(found)
 	return found
+}
+
+// parseJobs walks jobsNode into JobInfo entries, in declaration order —
+// the id/needs identity the job graph draws edges from.
+func parseJobs(jobsNode *yaml.Node) []JobInfo {
+	if jobsNode.Kind != yaml.MappingNode {
+		return nil
+	}
+	var jobs []JobInfo
+	for i := 0; i < len(jobsNode.Content); i += 2 {
+		id := jobsNode.Content[i].Value
+		jobNode := jobsNode.Content[i+1]
+		job := JobInfo{ID: id, Name: id}
+		if jobNode.Kind == yaml.MappingNode {
+			for j := 0; j < len(jobNode.Content); j += 2 {
+				switch jobNode.Content[j].Value {
+				case "name":
+					if v := jobNode.Content[j+1]; v.Kind == yaml.ScalarNode && v.Value != "" {
+						job.Name = v.Value
+					}
+				case "needs":
+					job.Needs = needsList(jobNode.Content[j+1])
+				}
+			}
+		}
+		jobs = append(jobs, job)
+	}
+	return jobs
+}
+
+// needsList normalizes needs:'s two shapes (a single job id, or a list of
+// them) into a flat list.
+func needsList(n *yaml.Node) []string {
+	switch n.Kind {
+	case yaml.ScalarNode:
+		return []string{n.Value}
+	case yaml.SequenceNode:
+		var needs []string
+		for _, item := range n.Content {
+			if item.Kind == yaml.ScalarNode {
+				needs = append(needs, item.Value)
+			}
+		}
+		return needs
+	}
+	return nil
 }
 
 // runsOnLabels normalizes every runs-on shape (scalar, list, or the

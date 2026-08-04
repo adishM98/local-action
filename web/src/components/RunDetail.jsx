@@ -2,26 +2,29 @@ import { useEffect, useMemo, useState } from 'react'
 import { X, ChevronRight } from 'lucide-react'
 import { api } from '../api.js'
 import StatusIcon, { StatusBadge } from './StatusIcon.jsx'
+import JobGraph from './JobGraph.jsx'
 import { relativeTime, duration, formatDurationMs } from '../format.js'
-import { parseLogLines } from '../logparse.js'
+import { parseLogLines, liveStatus } from '../logparse.js'
 
 const TERMINAL = ['success', 'failed', 'cancelled']
 
 // While the run is live: WS streams lines, a 2s poll tracks status. On any
 // terminal poll the persisted log replaces the streamed lines wholesale, so
 // WS hiccups can't lose output — SQLite is the source of truth at the end.
-export default function RunDetail({ runId, onClose, onOpenRun }) {
+export default function RunDetail({ runId, workflows, onClose, onOpenRun }) {
   const [run, setRun] = useState(null)
   const [lines, setLines] = useState([])
   const [error, setError] = useState(null)
   const [wsDown, setWsDown] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [view, setView] = useState('graph')
 
   useEffect(() => {
     setRun(null)
     setLines([])
     setError(null)
     setWsDown(false)
+    setView('graph')
     let cancelled = false
     let socket = null
     let interval = null
@@ -80,6 +83,16 @@ export default function RunDetail({ runId, onClose, onOpenRun }) {
 
   const parsed = useMemo(() => parseLogLines(lines), [lines])
   const isTerminal = run && TERMINAL.includes(run.status)
+  const workflowJobs = (run && workflows?.find((w) => w.file === run.workflowFile)?.jobs) || []
+  const hasGraph = workflowJobs.length > 1
+  const runtimeJobsById = useMemo(() => new Map(parsed.jobs.map((j) => [j.id, j])), [parsed.jobs])
+
+  function selectJob(jobId) {
+    setView('logs')
+    requestAnimationFrame(() => {
+      document.getElementById(`job-${jobId}`)?.scrollIntoView({ block: 'nearest' })
+    })
+  }
 
   async function cancel() {
     setBusy(true)
@@ -129,6 +142,22 @@ export default function RunDetail({ runId, onClose, onOpenRun }) {
             {run ? `${run.workflowFile} #${run.id}` : `Run #${runId}`}
           </h2>
           <div className="run-detail__actions">
+            {hasGraph && (
+              <div className="view-toggle">
+                <button
+                  className={`view-toggle__btn${view === 'graph' ? ' view-toggle__btn--active' : ''}`}
+                  onClick={() => setView('graph')}
+                >
+                  Graph
+                </button>
+                <button
+                  className={`view-toggle__btn${view === 'logs' ? ' view-toggle__btn--active' : ''}`}
+                  onClick={() => setView('logs')}
+                >
+                  Logs
+                </button>
+              </div>
+            )}
             {run && !isTerminal && (
               <button className="btn" onClick={cancel} disabled={busy}>
                 Cancel
@@ -156,31 +185,35 @@ export default function RunDetail({ runId, onClose, onOpenRun }) {
         </div>
       )}
       {error && <p className="error">{error}</p>}
-      {parsed.jobs.map((job) => (
-        <JobCard key={job.id} job={job} runStatus={run?.status} />
-      ))}
-      {parsed.other.length > 0 && (
-        <JobCard
-          job={{
-            id: '_other',
-            name: 'Output',
-            result: null,
-            steps: [{ name: 'Raw output', result: null, lines: parsed.other }],
-            tail: [],
-          }}
+      {hasGraph && view === 'graph' ? (
+        <JobGraph
+          jobs={workflowJobs}
+          runtimeJobsById={runtimeJobsById}
           runStatus={run?.status}
+          onSelectJob={selectJob}
         />
+      ) : (
+        <>
+          {parsed.jobs.map((job) => (
+            <JobCard key={job.id} job={job} runStatus={run?.status} />
+          ))}
+          {parsed.other.length > 0 && (
+            <JobCard
+              job={{
+                id: '_other',
+                name: 'Output',
+                result: null,
+                steps: [{ name: 'Raw output', result: null, lines: parsed.other }],
+                tail: [],
+              }}
+              runStatus={run?.status}
+            />
+          )}
+          {lines.length === 0 && !error && <p className="empty-state">Waiting for output…</p>}
+        </>
       )}
-      {lines.length === 0 && !error && <p className="empty-state">Waiting for output…</p>}
     </div>
   )
-}
-
-// null result while the run is live means "in progress"; after the run ends
-// an unresolved step just never ran (queued glyph, muted).
-function liveStatus(result, runStatus) {
-  if (result) return result
-  return runStatus === 'running' ? 'running' : 'queued'
 }
 
 function JobCard({ job, runStatus }) {
@@ -188,7 +221,7 @@ function JobCard({ job, runStatus }) {
   const completedSteps = job.steps.filter((s) => s.result).length
 
   return (
-    <section className="job-card">
+    <section className="job-card" id={`job-${job.id}`}>
       <header className="job-card__head">
         <StatusIcon status={liveStatus(job.result, runStatus)} />
         <h3>{job.name}</h3>

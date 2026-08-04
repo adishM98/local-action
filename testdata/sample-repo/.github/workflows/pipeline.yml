@@ -1,0 +1,25 @@
+name: Pipeline
+on: workflow_dispatch
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "building"
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "testing"
+  deploy:
+    needs: [build, test]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "deploying"
+  notify:
+    name: Notify
+    needs:
+      - test
+      - deploy
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "notifying"

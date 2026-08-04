@@ -815,3 +815,73 @@ jobs:
 		t.Errorf("expected nil SuggestedLabels, got %v", workflows[0].SuggestedLabels)
 	}
 }
+
+// TestParseWorkflowFile_JobsChainAndFanIn covers a build -> test -> deploy
+// chain plus notify fanning in from both test and deploy — the shapes a
+// real job graph has to render correctly: linear dependency, and multiple
+// needs on one job.
+func TestParseWorkflowFile_JobsChainAndFanIn(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", `name: CI
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps: []
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps: []
+  deploy:
+    needs: [build, test]
+    runs-on: ubuntu-latest
+    steps: []
+  notify:
+    name: Notify Slack
+    needs:
+      - test
+      - deploy
+    runs-on: ubuntu-latest
+    steps: []
+`)
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	want := []JobInfo{
+		{ID: "build", Name: "build"},
+		{ID: "test", Name: "test", Needs: []string{"build"}},
+		{ID: "deploy", Name: "deploy", Needs: []string{"build", "test"}},
+		{ID: "notify", Name: "Notify Slack", Needs: []string{"test", "deploy"}},
+	}
+	if !reflect.DeepEqual(workflows[0].Jobs, want) {
+		t.Errorf("Jobs:\ngot  %+v\nwant %+v", workflows[0].Jobs, want)
+	}
+}
+
+// TestParseWorkflowFile_JobsNoNeedsWhenIndependent guards against needs
+// being fabricated for jobs that don't declare it — an independent job
+// (no needs: at all) is a graph root, not (accidentally) dependent on
+// whatever job happens to precede it in the YAML.
+func TestParseWorkflowFile_JobsNoNeedsWhenIndependent(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", `name: CI
+on: push
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps: []
+  build:
+    runs-on: ubuntu-latest
+    steps: []
+`)
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	for _, job := range workflows[0].Jobs {
+		if job.Needs != nil {
+			t.Errorf("job %q: expected nil Needs, got %v", job.ID, job.Needs)
+		}
+	}
+}

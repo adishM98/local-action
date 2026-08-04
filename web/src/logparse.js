@@ -66,3 +66,11 @@ export function parseLogLines(lines) {
 
   return { jobs: jobs.map(({ stepsByName, firstTimeMs, ...job }) => job), other }
 }
+
+// null result while the run is live means "in progress"; after the run ends
+// an unresolved job/step just never ran (queued glyph, muted). Shared by
+// RunDetail's job cards and JobGraph's nodes — same job, same status logic.
+export function liveStatus(result, runStatus) {
+  if (result) return result
+  return runStatus === 'running' ? 'running' : 'queued'
+}

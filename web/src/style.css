@@ -982,6 +982,53 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   transition: width 300ms ease;
 }
 
+.view-toggle { display: flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.view-toggle__btn {
+  background: var(--panel-2);
+  border: none;
+  padding: 5px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.view-toggle__btn + .view-toggle__btn { border-left: 1px solid var(--border); }
+.view-toggle__btn--active { background: var(--panel); color: var(--text); }
+
+/* ── Job graph ────────────────────────────────────────── */
+/* React Flow gives us pan/zoom/drag for free — nodes/edges are still styled
+   to match this app's quiet aesthetic rather than React Flow's defaults. */
+/* Drawer is a fixed-height scroll container (see .drawer) — sizing off the
+   viewport rather than a flat pixel value lets the canvas claim the space
+   below the header instead of leaving it dead. */
+.job-graph { height: calc(100vh - 210px); min-height: 320px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.job-graph .react-flow__edge-path { stroke: var(--border); stroke-width: 2; }
+.job-graph .react-flow__attribution { display: none; }
+.job-graph .react-flow__controls-button {
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  fill: var(--text);
+}
+.job-graph .react-flow__controls-button:hover { background: var(--panel-2); }
+.job-graph__handle { width: 1px; height: 1px; background: transparent; border: none; }
+.job-graph__node {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+  transition: border-color 120ms ease;
+}
+.job-graph__node .status-icon svg { width: 12px; height: 12px; }
+.job-graph__node--running { border-color: var(--blue); }
+.job-graph__node--success { border-color: var(--green); }
+.job-graph__node--failed, .job-graph__node--failure { border-color: var(--red); }
+
 .step { border-bottom: 1px solid var(--border); }
 .step:last-child { border-bottom: none; }
 .step__header {

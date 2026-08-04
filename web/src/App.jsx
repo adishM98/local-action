@@ -164,7 +164,7 @@ export default function App() {
       </div>
       {drawerRunId && (
         <Drawer onClose={() => setDrawerRunId(null)}>
-          <RunDetail runId={drawerRunId} onClose={() => setDrawerRunId(null)} onOpenRun={setDrawerRunId} />
+          <RunDetail runId={drawerRunId} workflows={workflows} onClose={() => setDrawerRunId(null)} onOpenRun={setDrawerRunId} />
         </Drawer>
       )}
       <TerminalPanel repoPath={repoPath} />
