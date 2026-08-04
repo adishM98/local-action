@@ -39,6 +39,24 @@ func CreateRun(db *sql.DB, r Run) (int64, error) {
 	return res.LastInsertId()
 }
 
+// ReconcileOrphanedRuns marks any run left in "queued" or "running" as
+// "failed". Those statuses only mean something while the Engine that owns
+// them is alive — its in-memory bookkeeping (running map, worker queue)
+// doesn't survive a process restart or crash, so a row still "running" at
+// startup is guaranteed stale: nothing will ever move it to a terminal
+// state, and Cancel on it always fails with "run not active". Called once
+// at startup, before any Engine is constructed.
+func ReconcileOrphanedRuns(db *sql.DB, now int64) (int64, error) {
+	res, err := db.Exec(
+		`UPDATE runs SET status = ?, finished_at = COALESCE(finished_at, ?) WHERE status IN (?, ?)`,
+		string(StatusFailed), now, string(StatusQueued), string(StatusRunning),
+	)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
 func UpdateRunStatus(db *sql.DB, id int64, status RunStatus, startedAt, finishedAt *int64) error {
 	_, err := db.Exec(
 		`UPDATE runs SET status = ?, started_at = COALESCE(?, started_at), finished_at = COALESCE(?, finished_at) WHERE id = ?`,

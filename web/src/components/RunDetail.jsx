@@ -89,7 +89,7 @@ export default function RunDetail({ runId, workflows, onClose, onOpenRun }) {
   const parsed = useMemo(() => parseLogLines(lines), [lines])
   const isTerminal = run && TERMINAL.includes(run.status)
   const workflowJobs = (run && workflows?.find((w) => w.file === run.workflowFile)?.jobs) || []
-  const hasGraph = workflowJobs.length > 1
+  const hasGraph = workflowJobs.length > 0
   const runtimeJobsById = useMemo(() => new Map(parsed.jobs.map((j) => [j.id, j])), [parsed.jobs])
   const failedJobId = parsed.jobs.find((j) => j.result === 'failure')?.id || null
   const effectiveView = !hasGraph && view === 'graph' ? 'logs' : view
@@ -156,6 +156,16 @@ export default function RunDetail({ runId, workflows, onClose, onOpenRun }) {
           <h2 title={run ? `${run.workflowFile} #${run.id}` : `Run #${runId}`}>
             {run ? `${run.workflowFile} #${run.id}` : `Run #${runId}`}
           </h2>
+        </div>
+        <div className="run-detail__toolbar">
+          {run && (
+            <span className="run-detail__meta">
+              {run.event}
+              {run.branch && ` · ${run.branch}`}
+              {run.commitSha && ` (${run.commitSha})`} · {relativeTime(run.createdAt)}
+              {duration(run) && ` · ${duration(run)}`}
+            </span>
+          )}
           <div className="run-detail__actions">
             <div className="view-toggle">
               {hasGraph && (
@@ -191,14 +201,6 @@ export default function RunDetail({ runId, workflows, onClose, onOpenRun }) {
             )}
           </div>
         </div>
-        {run && (
-          <span className="run-detail__meta">
-            {run.event}
-            {run.branch && ` · ${run.branch}`}
-            {run.commitSha && ` (${run.commitSha})`} · {relativeTime(run.createdAt)}
-            {duration(run) && ` · ${duration(run)}`}
-          </span>
-        )}
       </div>
       {wsDown && run && !isTerminal && (
         <div className="banner banner--warn">

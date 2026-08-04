@@ -945,6 +945,11 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 .run-detail__head { display: flex; flex-direction: column; gap: 6px; margin: 12px 40px 22px 0; }
 .run-detail__head-row { display: flex; align-items: center; gap: 10px; }
 .run-detail__head-row h2 { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Title gets its own row above (see .run-detail__head-row) so it isn't
+   squeezed by the Graph/Logs/Code toggle + Cancel/Re-run — those and the
+   run's meta text share this second row instead, wrapping onto their own
+   line on narrow drawers rather than clipping the title. */
+.run-detail__toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .run-detail__meta { color: var(--muted); font-size: 13px; }
 .run-detail__actions { display: flex; gap: 8px; flex-shrink: 0; }
 

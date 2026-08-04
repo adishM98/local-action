@@ -111,6 +111,47 @@ func TestListRuns_EmptyMarshalsAsEmptyArray(t *testing.T) {
 	}
 }
 
+// TestReconcileOrphanedRuns_MarksStaleRunningAndQueuedAsFailed guards the
+// bug behind a run that shows "Running" forever and can't be cancelled: the
+// Engine's in-memory bookkeeping doesn't survive a process restart, so any
+// row still queued/running at startup is orphaned — nothing will ever move
+// it to a terminal state, and Cancel always fails with "run not active".
+func TestReconcileOrphanedRuns_MarksStaleRunningAndQueuedAsFailed(t *testing.T) {
+	db, err := db.OpenDB(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+
+	now := time.Now().Unix()
+	running, _ := CreateRun(db, Run{RepoPath: "/repo/a", WorkflowFile: "a.yml", Event: "push", Inputs: "{}", Status: StatusRunning, CreatedAt: now})
+	queued, _ := CreateRun(db, Run{RepoPath: "/repo/a", WorkflowFile: "b.yml", Event: "push", Inputs: "{}", Status: StatusQueued, CreatedAt: now})
+	success, _ := CreateRun(db, Run{RepoPath: "/repo/a", WorkflowFile: "c.yml", Event: "push", Inputs: "{}", Status: StatusSuccess, CreatedAt: now})
+
+	n, err := ReconcileOrphanedRuns(db, now)
+	if err != nil {
+		t.Fatalf("reconcile: %v", err)
+	}
+	if n != 2 {
+		t.Fatalf("expected 2 rows reconciled, got %d", n)
+	}
+
+	for _, id := range []int64{running, queued} {
+		run, _ := GetRun(db, id)
+		if run.Status != StatusFailed {
+			t.Errorf("run %d: expected failed, got %s", id, run.Status)
+		}
+		if !run.FinishedAt.Valid {
+			t.Errorf("run %d: expected finished_at to be set", id)
+		}
+	}
+
+	run, _ := GetRun(db, success)
+	if run.Status != StatusSuccess {
+		t.Errorf("run %d: expected untouched success status, got %s", success, run.Status)
+	}
+}
+
 // TestGetRunLogs_EmptyMarshalsAsEmptyArray guards the same nil-slice-to-null
 // pitfall for GetRunLogs, used by the log replay/history views.
 func TestGetRunLogs_EmptyMarshalsAsEmptyArray(t *testing.T) {

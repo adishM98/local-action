@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"time"
 
 	"local-action/internal/db"
 	"local-action/internal/httpapi"
@@ -41,6 +42,12 @@ func main() {
 		log.Fatalf("open database: %v", err)
 	}
 	defer db.Close()
+
+	if n, err := runs.ReconcileOrphanedRuns(db, time.Now().Unix()); err != nil {
+		log.Printf("reconcile orphaned runs: %v", err)
+	} else if n > 0 {
+		log.Printf("marked %d orphaned run(s) from a previous session as failed", n)
+	}
 
 	hub := ws.NewHub()
 	engine := runs.NewEngine(db, key, *actBin, hub.Broadcast, hub.Forget)

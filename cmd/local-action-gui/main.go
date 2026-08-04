@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	webview "github.com/webview/webview_go"
 
@@ -114,6 +115,12 @@ func startServer(dataDir string) bool {
 	database, err := db.OpenDB(filepath.Join(dataDir, "local-action.db"))
 	if err != nil {
 		log.Fatalf("open database: %v", err)
+	}
+
+	if n, err := runs.ReconcileOrphanedRuns(database, time.Now().Unix()); err != nil {
+		log.Printf("reconcile orphaned runs: %v", err)
+	} else if n > 0 {
+		log.Printf("marked %d orphaned run(s) from a previous session as failed", n)
 	}
 
 	hub := ws.NewHub()
