@@ -9,12 +9,22 @@ import SecretsPage from './components/SecretsPage.jsx'
 import Drawer from './components/Drawer.jsx'
 import TerminalPanel from './components/TerminalPanel.jsx'
 
+function loadView() {
+  try {
+    const raw = localStorage.getItem('view')
+    if (raw) return JSON.parse(raw)
+  } catch {
+    // corrupt/old value — fall through to the default below
+  }
+  return { name: 'overview' }
+}
+
 export default function App() {
   const [repoPath, setRepoPath] = useState(localStorage.getItem('repoPath') || '')
   const [workflows, setWorkflows] = useState([])
   const [scanState, setScanState] = useState({ scanned: false, error: null })
   const [scanning, setScanning] = useState(false)
-  const [view, setView] = useState({ name: 'overview' })
+  const [view, setView] = useState(loadView)
   const [health, setHealth] = useState(null)
   const [drawerRunId, setDrawerRunId] = useState(null)
   const [runs, setRuns] = useState([])
@@ -32,6 +42,10 @@ export default function App() {
   useEffect(() => {
     checkHealth()
   }, [checkHealth])
+
+  useEffect(() => {
+    localStorage.setItem('view', JSON.stringify(view))
+  }, [view])
 
   // Poll fast while unhealthy so a booting Docker Desktop turns the dot
   // green within seconds; back off once everything is fine.

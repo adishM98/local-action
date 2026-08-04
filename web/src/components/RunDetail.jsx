@@ -3,6 +3,7 @@ import { X, ChevronRight } from 'lucide-react'
 import { api } from '../api.js'
 import StatusIcon, { StatusBadge } from './StatusIcon.jsx'
 import JobGraph from './JobGraph.jsx'
+import WorkflowSource from './WorkflowSource.jsx'
 import { relativeTime, duration, formatDurationMs } from '../format.js'
 import { parseLogLines, liveStatus } from '../logparse.js'
 
@@ -18,6 +19,8 @@ export default function RunDetail({ runId, workflows, onClose, onOpenRun }) {
   const [wsDown, setWsDown] = useState(false)
   const [busy, setBusy] = useState(false)
   const [view, setView] = useState('graph')
+  const [source, setSource] = useState(null)
+  const [sourceError, setSourceError] = useState(null)
 
   useEffect(() => {
     setRun(null)
@@ -25,6 +28,8 @@ export default function RunDetail({ runId, workflows, onClose, onOpenRun }) {
     setError(null)
     setWsDown(false)
     setView('graph')
+    setSource(null)
+    setSourceError(null)
     let cancelled = false
     let socket = null
     let interval = null
@@ -86,6 +91,16 @@ export default function RunDetail({ runId, workflows, onClose, onOpenRun }) {
   const workflowJobs = (run && workflows?.find((w) => w.file === run.workflowFile)?.jobs) || []
   const hasGraph = workflowJobs.length > 1
   const runtimeJobsById = useMemo(() => new Map(parsed.jobs.map((j) => [j.id, j])), [parsed.jobs])
+  const failedJobId = parsed.jobs.find((j) => j.result === 'failure')?.id || null
+  const effectiveView = !hasGraph && view === 'graph' ? 'logs' : view
+
+  useEffect(() => {
+    if (view !== 'code' || source != null || !run) return
+    api
+      .getWorkflowSource(run.repoPath, run.workflowFile)
+      .then((result) => setSource(result.source))
+      .catch((err) => setSourceError(`Couldn't load workflow source: ${err.message}`))
+  }, [view, source, run])
 
   function selectJob(jobId) {
     setView('logs')
@@ -142,22 +157,28 @@ export default function RunDetail({ runId, workflows, onClose, onOpenRun }) {
             {run ? `${run.workflowFile} #${run.id}` : `Run #${runId}`}
           </h2>
           <div className="run-detail__actions">
-            {hasGraph && (
-              <div className="view-toggle">
+            <div className="view-toggle">
+              {hasGraph && (
                 <button
-                  className={`view-toggle__btn${view === 'graph' ? ' view-toggle__btn--active' : ''}`}
+                  className={`view-toggle__btn${effectiveView === 'graph' ? ' view-toggle__btn--active' : ''}`}
                   onClick={() => setView('graph')}
                 >
                   Graph
                 </button>
-                <button
-                  className={`view-toggle__btn${view === 'logs' ? ' view-toggle__btn--active' : ''}`}
-                  onClick={() => setView('logs')}
-                >
-                  Logs
-                </button>
-              </div>
-            )}
+              )}
+              <button
+                className={`view-toggle__btn${effectiveView === 'logs' ? ' view-toggle__btn--active' : ''}`}
+                onClick={() => setView('logs')}
+              >
+                Logs
+              </button>
+              <button
+                className={`view-toggle__btn${effectiveView === 'code' ? ' view-toggle__btn--active' : ''}`}
+                onClick={() => setView('code')}
+              >
+                Code
+              </button>
+            </div>
             {run && !isTerminal && (
               <button className="btn" onClick={cancel} disabled={busy}>
                 Cancel
@@ -185,13 +206,21 @@ export default function RunDetail({ runId, workflows, onClose, onOpenRun }) {
         </div>
       )}
       {error && <p className="error">{error}</p>}
-      {hasGraph && view === 'graph' ? (
+      {effectiveView === 'graph' ? (
         <JobGraph
           jobs={workflowJobs}
           runtimeJobsById={runtimeJobsById}
           runStatus={run?.status}
           onSelectJob={selectJob}
         />
+      ) : effectiveView === 'code' ? (
+        sourceError ? (
+          <p className="error">{sourceError}</p>
+        ) : source == null ? (
+          <p className="empty-state">Loading source…</p>
+        ) : (
+          <WorkflowSource source={source} jobs={workflowJobs} highlightJobId={failedJobId} />
+        )
       ) : (
         <>
           {parsed.jobs.map((job) => (

@@ -1029,6 +1029,11 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 .job-graph__node--success { border-color: var(--green); }
 .job-graph__node--failed, .job-graph__node--failure { border-color: var(--red); }
 
+/* ── Workflow source ─────────────────────────────────── */
+.workflow-source { font-family: var(--mono); font-size: 12.5px; padding: 8px 0; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); max-height: calc(100vh - 260px); overflow-y: auto; }
+.workflow-source__line--failed { background: rgba(248, 81, 73, 0.12); border-left: 2px solid var(--red); }
+.workflow-source__line--failed .log-line__no { color: var(--red); }
+
 .step { border-bottom: 1px solid var(--border); }
 .step:last-child { border-bottom: none; }
 .step__header {

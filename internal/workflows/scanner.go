@@ -63,11 +63,14 @@ type WorkflowInfo struct {
 // JobInfo is one job's static structure — id is the YAML key (what a
 // sibling job's needs: entry references, and the same identity act's
 // jobID log field uses), name is the human-readable label (defaults to id
-// when the job has no name: of its own).
+// when the job has no name: of its own). Line is the 1-based line where the
+// job's key appears in the workflow file, used to locate its YAML block
+// when the frontend points at the source for a failed job.
 type JobInfo struct {
 	ID    string   `json:"id"`
 	Name  string   `json:"name"`
 	Needs []string `json:"needs,omitempty"`
+	Line  int      `json:"line,omitempty"`
 }
 
 // categoryKeywords is checked in order — more specific categories (Security)
@@ -173,6 +176,25 @@ func ScanWorkflows(repoPath string) ([]WorkflowInfo, error) {
 		results = append(results, info)
 	}
 	return results, nil
+}
+
+// ReadWorkflowSource returns the raw YAML for a workflow file, for the
+// frontend's "view source" panel. workflowFile is client-supplied (a repo
+// path picked from the scan results), so it's resolved and re-checked
+// against the workflows dir rather than trusted outright — otherwise a
+// crafted "../../etc/passwd"-style value could read any file the process
+// can see.
+func ReadWorkflowSource(repoPath, workflowFile string) (string, error) {
+	dir := filepath.Clean(filepath.Join(repoPath, ".github", "workflows"))
+	full := filepath.Clean(filepath.Join(repoPath, workflowFile))
+	if full != dir && !strings.HasPrefix(full, dir+string(filepath.Separator)) {
+		return "", fmt.Errorf("workflow file is outside the workflows directory: %s", workflowFile)
+	}
+	data, err := os.ReadFile(full)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
 }
 
 func ParseWorkflowFile(path string) (WorkflowInfo, error) {
@@ -570,7 +592,7 @@ func parseJobs(jobsNode *yaml.Node) []JobInfo {
 	for i := 0; i < len(jobsNode.Content); i += 2 {
 		id := jobsNode.Content[i].Value
 		jobNode := jobsNode.Content[i+1]
-		job := JobInfo{ID: id, Name: id}
+		job := JobInfo{ID: id, Name: id, Line: jobsNode.Content[i].Line}
 		if jobNode.Kind == yaml.MappingNode {
 			for j := 0; j < len(jobNode.Content); j += 2 {
 				switch jobNode.Content[j].Value {

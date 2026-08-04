@@ -849,10 +849,10 @@ jobs:
 		t.Fatalf("scan: %v", err)
 	}
 	want := []JobInfo{
-		{ID: "build", Name: "build"},
-		{ID: "test", Name: "test", Needs: []string{"build"}},
-		{ID: "deploy", Name: "deploy", Needs: []string{"build", "test"}},
-		{ID: "notify", Name: "Notify Slack", Needs: []string{"test", "deploy"}},
+		{ID: "build", Name: "build", Line: 4},
+		{ID: "test", Name: "test", Needs: []string{"build"}, Line: 7},
+		{ID: "deploy", Name: "deploy", Needs: []string{"build", "test"}, Line: 11},
+		{ID: "notify", Name: "Notify Slack", Needs: []string{"test", "deploy"}, Line: 15},
 	}
 	if !reflect.DeepEqual(workflows[0].Jobs, want) {
 		t.Errorf("Jobs:\ngot  %+v\nwant %+v", workflows[0].Jobs, want)
@@ -883,5 +883,27 @@ jobs:
 		if job.Needs != nil {
 			t.Errorf("job %q: expected nil Needs, got %v", job.ID, job.Needs)
 		}
+	}
+}
+
+func TestReadWorkflowSource(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", "name: CI\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n")
+
+	source, err := ReadWorkflowSource(repo, ".github/workflows/ci.yml")
+	if err != nil {
+		t.Fatalf("ReadWorkflowSource: %v", err)
+	}
+	if !strings.Contains(source, "name: CI") {
+		t.Errorf("source missing expected content: %q", source)
+	}
+}
+
+func TestReadWorkflowSource_RejectsPathEscape(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", "name: CI\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n")
+
+	if _, err := ReadWorkflowSource(repo, "../../etc/passwd"); err == nil {
+		t.Error("expected an error escaping the workflows directory, got nil")
 	}
 }
