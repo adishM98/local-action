@@ -764,9 +764,208 @@ jobs:
 	if err != nil {
 		t.Fatalf("scan: %v", err)
 	}
-	want := []string{"run-cypress", "run-cypress-ce", "run-cypress-ce-deployments", "run-cypress-ee-deployments"}
+	want := []LabelOption{{Label: "run-cypress"}, {Label: "run-cypress-ce"}, {Label: "run-cypress-ce-deployments"}, {Label: "run-cypress-ee-deployments"}}
 	if !reflect.DeepEqual(workflows[0].SuggestedLabels, want) {
 		t.Errorf("SuggestedLabels: got %v, want %v", workflows[0].SuggestedLabels, want)
+	}
+	if workflows[0].SuggestedLabelShape != "prLabels" {
+		t.Errorf("SuggestedLabelShape: got %q, want prLabels", workflows[0].SuggestedLabelShape)
+	}
+}
+
+// TestParseWorkflowFile_SuggestedLabels_EventLabelIdiom covers the
+// "labeled" webhook event's own shape — github.event.label.name == 'x',
+// usually paired with github.event.action == 'labeled' and OR'd against a
+// second, shared label name per job (e.g. a real ToolJet workflow: each
+// area has its own label, plus a catch-all "check-everything" label that
+// runs every job). action's presence must not disqualify the dropdown here
+// — it's the expected companion, not an unrelated requirement.
+func TestParseWorkflowFile_SuggestedLabels_EventLabelIdiom(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", `name: CI
+on: pull_request_target
+jobs:
+  frontend:
+    if: ${{ github.event.action == 'labeled' && (github.event.label.name == 'frontend-vulnerability' || github.event.label.name == 'check-vulnerability') }}
+    runs-on: ubuntu-latest
+    steps: []
+  server:
+    if: ${{ github.event.action == 'labeled' && (github.event.label.name == 'server-vulnerability' || github.event.label.name == 'check-vulnerability') }}
+    runs-on: ubuntu-latest
+    steps: []
+`)
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	want := []LabelOption{
+		{Label: "frontend-vulnerability", Action: "labeled"},
+		{Label: "check-vulnerability", Action: "labeled"},
+		{Label: "server-vulnerability", Action: "labeled"},
+	}
+	if !reflect.DeepEqual(workflows[0].SuggestedLabels, want) {
+		t.Errorf("SuggestedLabels: got %v, want %v", workflows[0].SuggestedLabels, want)
+	}
+	if workflows[0].SuggestedLabelShape != "eventLabel" {
+		t.Errorf("SuggestedLabelShape: got %q, want eventLabel", workflows[0].SuggestedLabelShape)
+	}
+}
+
+// TestParseWorkflowFile_SuggestedLabels_SameLabelDifferentActions covers a
+// real ToolJet pattern: the same label name gates a "create" job on
+// labeled and a "suspend" job on unlabeled — these must stay as two
+// distinct options (the dropdown needs to build a different payload for
+// each), not collapse into one. Also covers "(labeled && label check) ||
+// action == 'closed'" — a branch with no label at all, which must be
+// skipped rather than disqualifying the whole workflow.
+func TestParseWorkflowFile_SuggestedLabels_SameLabelDifferentActions(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", `name: CI
+on: pull_request_target
+jobs:
+  create:
+    if: ${{ github.event.action == 'labeled' && github.event.label.name == 'preview-app' }}
+    runs-on: ubuntu-latest
+    steps: []
+  destroy:
+    if: ${{ (github.event.action == 'labeled' && github.event.label.name == 'destroy-preview-app') || github.event.action == 'closed' }}
+    runs-on: ubuntu-latest
+    steps: []
+  suspend:
+    if: ${{ github.event.action == 'unlabeled' && github.event.label.name == 'preview-app' }}
+    runs-on: ubuntu-latest
+    steps: []
+`)
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	want := []LabelOption{
+		{Label: "preview-app", Action: "labeled"},
+		{Label: "destroy-preview-app", Action: "labeled"},
+		{Label: "preview-app", Action: "unlabeled"},
+	}
+	if !reflect.DeepEqual(workflows[0].SuggestedLabels, want) {
+		t.Errorf("SuggestedLabels:\ngot  %v\nwant %v", workflows[0].SuggestedLabels, want)
+	}
+	if workflows[0].SuggestedLabelShape != "eventLabel" {
+		t.Errorf("SuggestedLabelShape: got %q, want eventLabel", workflows[0].SuggestedLabelShape)
+	}
+}
+
+// TestParseWorkflowFile_NegatedContainsIsNotSuggestedAsPositiveLabel guards
+// a real correctness bug, not just a missing convenience: !contains(...)
+// means "does NOT have this label" — picking the suggested label from a
+// dropdown built as if it were a positive check would produce a payload
+// that makes the real condition evaluate false, so the job silently
+// wouldn't run at all despite the user picking a label expecting it to.
+func TestParseWorkflowFile_NegatedContainsIsNotSuggestedAsPositiveLabel(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", `name: CI
+on: pull_request
+jobs:
+  build:
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'wip') }}
+    runs-on: ubuntu-latest
+    steps: []
+`)
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	if workflows[0].SuggestedLabels != nil {
+		t.Errorf("expected nil SuggestedLabels for a negated contains(), got %v", workflows[0].SuggestedLabels)
+	}
+	if workflows[0].SuggestedEventPayload != "" {
+		t.Errorf("expected no best-effort payload guess for a negated contains(), got %q", workflows[0].SuggestedEventPayload)
+	}
+}
+
+// TestParseWorkflowFile_NoSuggestedLabelsWhenIdiomsMix guards against a
+// dropdown that can't actually represent the workflow: if one job uses the
+// contains(pull_request.labels...) idiom and another uses
+// github.event.label.name, there's no single payload shape a picked label
+// could produce that satisfies both, so this must fall back to nil.
+// TestParseWorkflowFile_SuggestedLabels_IssueLabelsIdiom covers the
+// issues/issue_comment equivalent of the pull_request.labels idiom — per
+// GitHub's webhook payload docs, contains(github.event.issue.labels.*.name,
+// 'x') is the identical array-of-labels shape, just rooted at "issue"
+// instead of "pull_request" (issues are the same underlying object as PRs
+// in GitHub's data model).
+func TestParseWorkflowFile_SuggestedLabels_IssueLabelsIdiom(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", `name: CI
+on: issue_comment
+jobs:
+  build:
+    if: contains(github.event.issue.labels.*.name, 'triage')
+    runs-on: ubuntu-latest
+    steps: []
+`)
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	want := []LabelOption{{Label: "triage"}}
+	if !reflect.DeepEqual(workflows[0].SuggestedLabels, want) {
+		t.Errorf("SuggestedLabels: got %v, want %v", workflows[0].SuggestedLabels, want)
+	}
+	if workflows[0].SuggestedLabelShape != "issueLabels" {
+		t.Errorf("SuggestedLabelShape: got %q, want issueLabels", workflows[0].SuggestedLabelShape)
+	}
+}
+
+// TestParseWorkflowFile_NoSuggestedLabelsWhenPrAndIssueLabelsMix guards
+// against a dropdown that can't be represented by one payload: pull_request
+// labels live under "pull_request", issue/issue_comment labels live under
+// "issue" — a workflow checking both needs two different payload roots at
+// once, so this must fall back to nil rather than silently picking one.
+func TestParseWorkflowFile_NoSuggestedLabelsWhenPrAndIssueLabelsMix(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", `name: CI
+on: pull_request_target
+jobs:
+  build:
+    if: contains(github.event.pull_request.labels.*.name, 'run-ci')
+    runs-on: ubuntu-latest
+    steps: []
+  comment:
+    if: contains(github.event.issue.labels.*.name, 'triage')
+    runs-on: ubuntu-latest
+    steps: []
+`)
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	if workflows[0].SuggestedLabels != nil {
+		t.Errorf("expected nil SuggestedLabels when pull_request/issue labels mix, got %v", workflows[0].SuggestedLabels)
+	}
+}
+
+func TestParseWorkflowFile_NoSuggestedLabelsWhenIdiomsMix(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", `name: CI
+on: pull_request_target
+jobs:
+  build:
+    if: contains(github.event.pull_request.labels.*.name, 'run-ci')
+    runs-on: ubuntu-latest
+    steps: []
+  vuln:
+    if: ${{ github.event.action == 'labeled' && github.event.label.name == 'check-vulnerability' }}
+    runs-on: ubuntu-latest
+    steps: []
+`)
+	workflows, err := ScanWorkflows(repo)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	if workflows[0].SuggestedLabels != nil {
+		t.Errorf("expected nil SuggestedLabels when idioms mix, got %v", workflows[0].SuggestedLabels)
+	}
+	if workflows[0].SuggestedLabelShape != "" {
+		t.Errorf("expected empty SuggestedLabelShape when idioms mix, got %q", workflows[0].SuggestedLabelShape)
 	}
 }
 

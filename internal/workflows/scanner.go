@@ -34,15 +34,33 @@ type WorkflowInfo struct {
 	// clauses it found regardless of &&/||, so the user still needs to
 	// check it.
 	SuggestedEventPayload string `json:"suggestedEventPayload,omitempty"`
-	// SuggestedLabels lists the PR label values (deduped, first-seen order)
-	// this workflow's if: conditions check for via the
-	// contains(github.event.pull_request.labels.*.name, 'x') idiom — set
-	// only when that idiom is the SOLE recognized pattern across every job
-	// (see collectSuggestedLabels). The frontend uses this to offer a
-	// "pick a label" dropdown instead of the raw JSON payload field; a
-	// workflow whose condition mixes label checks with anything else falls
-	// back to the general JSON field, same as before this field existed.
-	SuggestedLabels []string `json:"suggestedLabels,omitempty"`
+	// SuggestedLabels lists the (label, action) options (deduped, first-seen
+	// order) this workflow's if: conditions check for — either the
+	// contains(github.event.pull_request.labels.*.name, 'x') idiom, or the
+	// github.event.label.name == 'x' idiom (the "labeled"/"unlabeled"
+	// webhook event) — set only when exactly one of those idioms is the
+	// SOLE recognized pattern across every job (see collectSuggestedLabels).
+	// The same label name can legitimately appear twice with different
+	// Action values (e.g. a "suspend" job reacting to it being added, a
+	// "resume" job reacting to it being removed) — that's two distinct
+	// options, not a duplicate, since they trigger different jobs. The
+	// frontend uses this to offer a "pick a label" dropdown instead of the
+	// raw JSON payload field; a workflow whose condition mixes label checks
+	// with anything else, or mixes both idioms, falls back to the general
+	// JSON field instead.
+	SuggestedLabels []LabelOption `json:"suggestedLabels,omitempty"`
+	// SuggestedLabelShape says which idiom SuggestedLabels came from, so the
+	// frontend knows what shape of payload a picked option needs to become:
+	// "prLabels" -> {"pull_request":{"labels":[{"name":"<label>"}]}}
+	// "issueLabels" -> {"issue":{"labels":[{"name":"<label>"}]}}
+	// "eventLabel" -> {"action":"<action>","label":{"name":"<label>"}}
+	// prLabels and issueLabels are GitHub's identical labels-array idiom,
+	// just under different root objects (pull_request vs issue — the same
+	// idiom works on issues/issue_comment triggers, per GitHub's webhook
+	// payload docs); a workflow mixing both still can't be represented by
+	// one payload and falls back to the general JSON field like any other
+	// unrecognized mix. Empty whenever SuggestedLabels is empty.
+	SuggestedLabelShape string `json:"suggestedLabelShape,omitempty"`
 	// IncompatibleRunners lists any runs-on labels (deduped, sorted) that
 	// act cannot actually honor: act only ever runs Linux containers, so
 	// windows-*/macos-*/self-hosted labels silently either fail or fall
@@ -253,7 +271,7 @@ func ParseWorkflowFile(path string) (WorkflowInfo, error) {
 
 	if jobsNode != nil {
 		info.AutoEventPayload, info.SuggestedEventPayload, info.NeedsEventPayload = autoEventPayloadFromJobs(jobsNode)
-		info.SuggestedLabels = collectSuggestedLabels(jobsNode)
+		info.SuggestedLabels, info.SuggestedLabelShape = collectSuggestedLabels(jobsNode)
 		info.IncompatibleRunners = incompatibleRunners(jobsNode)
 		info.Jobs = parseJobs(jobsNode)
 	}
@@ -302,13 +320,59 @@ func parseOnNode(n *yaml.Node) ([]string, []DispatchInput, error) {
 var (
 	// Plain equality: github.event.<path> == 'value'.
 	ifClauseRe = regexp.MustCompile(`github\.event\.([A-Za-z0-9_.]+)\s*==\s*(?:'([^']*)'|"([^"]*)")`)
-	// The common "does this PR have label X" idiom: GitHub's `.*.` glob
-	// selects a field across every element of an array and flattens it
+	// The common "does this PR/issue have label X" idiom: GitHub's `.*.`
+	// glob selects a field across every element of an array and flattens it
 	// into a list, which contains() then searches — e.g.
-	// contains(github.event.pull_request.labels.*.name, 'run-ci').
+	// contains(github.event.pull_request.labels.*.name, 'run-ci'). Per
+	// GitHub's webhook payload docs, issues/issue_comment triggers carry
+	// the identical shape under github.event.issue.labels instead — the
+	// regex matches either root; collectSuggestedLabels is what decides
+	// which one is actually present and disqualifies on a mix of both.
 	containsLabelRe = regexp.MustCompile(`contains\(\s*github\.event\.([A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*)\.\*\.([A-Za-z0-9_]+)\s*,\s*(?:'([^']*)'|"([^"]*)")\s*\)`)
 	githubEventRe   = regexp.MustCompile(`github\.event\.`)
 )
+
+// isNegatedAt reports whether the character immediately before cond[idx]
+// (skipping whitespace) is "!" — i.e. whether the clause starting at idx is
+// negated, e.g. !contains(...). A negated contains() means "does NOT have
+// this label"; matching it the same as the positive form would suggest a
+// label that, if picked, makes the condition FALSE instead of true — the
+// exact inverse of what picking a label from the dropdown is supposed to
+// do. Doesn't handle "!=" (a different token, already excluded since
+// ifClauseRe only matches "==") or "!(...)" wrapping a whole parenthesized
+// group — both real but rarer than a bare !contains(...).
+func isNegatedAt(cond string, idx int) bool {
+	i := idx - 1
+	for i >= 0 && (cond[i] == ' ' || cond[i] == '\t') {
+		i--
+	}
+	return i >= 0 && cond[i] == '!'
+}
+
+// positiveMatches runs re against cond like FindAllStringSubmatch, minus any
+// match that's actually negated (see isNegatedAt) — every caller that cares
+// about matching a POSITIVE "this is true" check should use this instead of
+// calling the regex directly.
+func positiveMatches(re *regexp.Regexp, cond string) [][]string {
+	idxMatches := re.FindAllSubmatchIndex([]byte(cond), -1)
+	var out [][]string
+	for _, idx := range idxMatches {
+		if isNegatedAt(cond, idx[0]) {
+			continue
+		}
+		groups := make([]string, len(idx)/2)
+		for g := 0; g < len(idx)/2; g++ {
+			if idx[2*g] >= 0 {
+				groups[g] = cond[idx[2*g]:idx[2*g+1]]
+			}
+		}
+		out = append(out, groups)
+	}
+	return out
+}
+
+func containsLabelMatches(cond string) [][]string { return positiveMatches(containsLabelRe, cond) }
+func ifClauseMatches(cond string) [][]string       { return positiveMatches(ifClauseRe, cond) }
 
 // autoEventPayloadFromJobs merges the recognizable clauses from EVERY job's
 // if: condition (not just the first) into one payload — a workflow's jobs
@@ -368,22 +432,58 @@ func autoEventPayloadFromJobs(jobsNode *yaml.Node) (payload, suggested string, n
 	return "", string(b), true
 }
 
-// collectSuggestedLabels scans every job's if: condition for the
-// contains(github.event.pull_request.labels.*.name, 'x') idiom and returns
-// the deduped label values in first-seen order — but only when that idiom
-// is the ONLY recognized pattern anywhere in the workflow. A single other
-// clause (a plain github.event.<path> == 'value' check, or a contains()
-// over some other array/leaf) means a label pick alone wouldn't fully
-// determine a coherent payload, so it returns nil and the caller falls back
-// to the general JSON payload field instead.
-func collectSuggestedLabels(jobsNode *yaml.Node) []string {
+// LabelOption is one label a workflow's if: conditions check for, paired
+// with the action value ("labeled"/"unlabeled") it needs to actually
+// trigger the job that checks it — see collectSuggestedLabels. Action is
+// always empty for the prLabels idiom, which has no action field at all.
+type LabelOption struct {
+	Label  string `json:"label"`
+	Action string `json:"action,omitempty"`
+}
+
+// collectSuggestedLabels scans every job's if: condition for either of two
+// label-checking idioms and returns the deduped (label, action) options in
+// first-seen order, plus which idiom they came from. The same label name
+// can legitimately produce two different options (e.g. a "suspend" job
+// reacting to it being added, a "resume" job reacting to it being
+// removed) — picking the wrong action would build a payload that silently
+// doesn't trigger the job the user meant to simulate, so those must stay
+// distinct rather than collapsing into one.
+//
+// Pairing an eventLabel match's action is positional: within one
+// condition, the action value most recently seen before a label.name match
+// is that label's action — matching how these conditions are actually
+// written (action check first, e.g. "action == 'labeled' && (label.name ==
+// 'a' || label.name == 'b')"). An action clause with no label.name
+// anywhere in the same condition (e.g. "... || action == 'closed'", a
+// branch with nothing to do with any label) is simply skipped rather than
+// disqualifying — the dropdown just can't simulate that branch, same as it
+// never claimed to cover every possible trigger.
+//
+// The two idioms, and any other clause, disqualify the whole workflow
+// under the same rule as before: only recognized when it's the SOLE
+// pattern used, and the workflow doesn't mix both label idioms across
+// jobs (a single dropdown can't represent two different payload shapes).
+func collectSuggestedLabels(jobsNode *yaml.Node) (options []LabelOption, shape string) {
 	if jobsNode.Kind != yaml.MappingNode {
-		return nil
+		return nil, ""
 	}
 
-	var labels []string
-	seen := map[string]bool{}
+	seen := map[LabelOption]bool{}
 	sawOther := false
+	setShape := func(s string) {
+		if shape != "" && shape != s {
+			sawOther = true // mixing both idioms — no single payload shape fits
+			return
+		}
+		shape = s
+	}
+	add := func(opt LabelOption) {
+		if !seen[opt] {
+			seen[opt] = true
+			options = append(options, opt)
+		}
+	}
 
 	for i := 0; i < len(jobsNode.Content); i += 2 {
 		jobNode := jobsNode.Content[i+1]
@@ -402,11 +502,45 @@ func collectSuggestedLabels(jobsNode *yaml.Node) []string {
 			if !githubEventRe.MatchString(cond) {
 				continue
 			}
-			if len(ifClauseRe.FindAllStringSubmatch(cond, -1)) > 0 {
-				sawOther = true
+			ifMatches := ifClauseMatches(cond)
+			// github.event.action == '...' is only a safe companion clause
+			// alongside label.name checks (the real shape of a "labeled"/
+			// "unlabeled" webhook event) — the same clause next to the
+			// contains(pull_request.labels...) idiom (no label.name
+			// present) is a genuinely separate requirement a label-only
+			// payload can't satisfy, so it must still disqualify there.
+			isEventLabelCond := false
+			for _, m := range ifMatches {
+				if m[1] == "label.name" {
+					isEventLabelCond = true
+					break
+				}
 			}
-			for _, m := range containsLabelRe.FindAllStringSubmatch(cond, -1) {
-				if m[1] != "pull_request.labels" || m[2] != "name" {
+			lastAction := ""
+			for _, m := range ifMatches {
+				value := m[2]
+				if value == "" && m[3] != "" {
+					value = m[3]
+				}
+				switch {
+				case m[1] == "label.name":
+					setShape("eventLabel")
+					add(LabelOption{Label: value, Action: lastAction})
+				case m[1] == "action" && isEventLabelCond:
+					lastAction = value
+				default:
+					sawOther = true
+				}
+			}
+			for _, m := range containsLabelMatches(cond) {
+				var shapeForPath string
+				switch m[1] {
+				case "pull_request.labels":
+					shapeForPath = "prLabels"
+				case "issue.labels":
+					shapeForPath = "issueLabels"
+				}
+				if shapeForPath == "" || m[2] != "name" {
 					sawOther = true
 					continue
 				}
@@ -414,18 +548,16 @@ func collectSuggestedLabels(jobsNode *yaml.Node) []string {
 				if value == "" && m[4] != "" {
 					value = m[4]
 				}
-				if !seen[value] {
-					seen[value] = true
-					labels = append(labels, value)
-				}
+				setShape(shapeForPath)
+				add(LabelOption{Label: value})
 			}
 		}
 	}
 
-	if sawOther || len(labels) == 0 {
-		return nil
+	if sawOther || len(options) == 0 {
+		return nil, ""
 	}
-	return labels
+	return options, shape
 }
 
 // solveIfCondition fully solves cond only when it's a plain conjunction
@@ -475,7 +607,7 @@ func mergeEventPayloadClauses(root map[string]any, cond string) bool {
 	cond = strings.TrimSpace(cond)
 
 	found := false
-	for _, m := range ifClauseRe.FindAllStringSubmatch(cond, -1) {
+	for _, m := range ifClauseMatches(cond) {
 		value := m[2]
 		if value == "" && m[3] != "" {
 			value = m[3]
@@ -483,7 +615,7 @@ func mergeEventPayloadClauses(root map[string]any, cond string) bool {
 		setNestedPath(root, strings.Split(m[1], "."), value)
 		found = true
 	}
-	for _, m := range containsLabelRe.FindAllStringSubmatch(cond, -1) {
+	for _, m := range containsLabelMatches(cond) {
 		value := m[3]
 		if value == "" && m[4] != "" {
 			value = m[4]
