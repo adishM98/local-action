@@ -900,6 +900,11 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23a1a1aa' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 8px center;
+  /* No explicit width/height on the SVG itself, so without background-size
+     browsers fall back to the (much larger) intrinsic default instead of
+     matching its viewBox — the chevron rendered oversized everywhere a
+     <select> uses this rule. */
+  background-size: 12px 12px;
 }
 .field input.field__checkbox {
   width: 16px;
