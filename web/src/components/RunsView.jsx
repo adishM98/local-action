@@ -4,6 +4,8 @@ import { Search, RotateCw } from 'lucide-react'
 import { api } from '../api.js'
 import StatusIcon, { StatusCircle } from './StatusIcon.jsx'
 import RunWorkflowMenu from './RunWorkflowMenu.jsx'
+import Drawer from './Drawer.jsx'
+import WorkflowPreview from './WorkflowPreview.jsx'
 import { relativeTime, duration, formatDurationMs, computeRunStats, filterRuns } from '../format.js'
 
 const STATUS_OPTIONS = ['success', 'failed', 'running', 'queued', 'cancelled']
@@ -27,6 +29,7 @@ export default function RunsView({
   const [eventFilter, setEventFilter] = useState('')
   const [branchFilter, setBranchFilter] = useState('')
   const [page, setPage] = useState(1)
+  const [showPreview, setShowPreview] = useState(false)
 
   useEffect(() => {
     setPage(1)
@@ -71,13 +74,18 @@ export default function RunsView({
           </p>
         </div>
         {workflow && !workflow.parseError && (
-          <RunWorkflowMenu
-            key={workflow.file}
-            repoPath={repoPath}
-            workflow={workflow}
-            onStarted={onOpenRun}
-            onOpenSecrets={onOpenSecrets}
-          />
+          <div className="runs-view__head-actions">
+            <button className="btn" onClick={() => setShowPreview(true)}>
+              View workflow
+            </button>
+            <RunWorkflowMenu
+              key={workflow.file}
+              repoPath={repoPath}
+              workflow={workflow}
+              onStarted={onOpenRun}
+              onOpenSecrets={onOpenSecrets}
+            />
+          </div>
         )}
       </div>
       {workflow?.parseError && <p className="error">{workflow.parseError}</p>}
@@ -165,6 +173,11 @@ export default function RunsView({
             Next →
           </button>
         </div>
+      )}
+      {showPreview && workflow && (
+        <Drawer onClose={() => setShowPreview(false)}>
+          <WorkflowPreview repoPath={repoPath} workflow={workflow} onClose={() => setShowPreview(false)} />
+        </Drawer>
       )}
     </div>
   )
