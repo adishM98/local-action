@@ -27,6 +27,8 @@ export const api = {
     request('POST', '/api/event-payload', { repoPath, workflowFile, payload }),
   getWorkflowSource: (repoPath, workflowFile) =>
     request('GET', `/api/workflow-source?repoPath=${encodeURIComponent(repoPath)}&workflowFile=${encodeURIComponent(workflowFile)}`),
+  getWorkflowFileMTime: (repoPath, workflowFile) =>
+    request('GET', `/api/workflow-file-mtime?repoPath=${encodeURIComponent(repoPath)}&workflowFile=${encodeURIComponent(workflowFile)}`),
   getWorkflowCategories: (repoPath) =>
     request('GET', `/api/workflow-categories?repoPath=${encodeURIComponent(repoPath)}`),
   saveWorkflowCategory: (repoPath, workflowFile, category) =>

@@ -21,6 +21,7 @@ export default function RunDetail({ runId, workflows, onClose, onOpenRun }) {
   const [view, setView] = useState('graph')
   const [source, setSource] = useState(null)
   const [sourceError, setSourceError] = useState(null)
+  const [fileChanged, setFileChanged] = useState(false)
 
   useEffect(() => {
     setRun(null)
@@ -30,6 +31,7 @@ export default function RunDetail({ runId, workflows, onClose, onOpenRun }) {
     setView('graph')
     setSource(null)
     setSourceError(null)
+    setFileChanged(false)
     let cancelled = false
     let socket = null
     let interval = null
@@ -110,6 +112,32 @@ export default function RunDetail({ runId, workflows, onClose, onOpenRun }) {
       .then((result) => setSource(result.source))
       .catch((err) => setSourceError(`Couldn't load workflow source: ${err.message}`))
   }, [view, source, run])
+
+  // Detects an edit made outside the app (in an editor, a git checkout,
+  // etc.) while this run's detail view is open — mtime is enough, no need
+  // to read/hash the file just to answer "has anything happened to this
+  // since the run started." Keeps polling even after it fires since the
+  // file could be edited again; keeps polling regardless of run status
+  // since re-running a still-in-progress run is a legitimate (if unusual)
+  // choice, same as GitHub's own "re-run" always being available.
+  useEffect(() => {
+    if (!run) return
+    let cancelled = false
+    function check() {
+      api
+        .getWorkflowFileMTime(run.repoPath, run.workflowFile)
+        .then((result) => {
+          if (!cancelled && result.mtime > run.createdAt) setFileChanged(true)
+        })
+        .catch(() => {})
+    }
+    check()
+    const interval = setInterval(check, 3000)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [run?.repoPath, run?.workflowFile, run?.createdAt])
 
   function selectJob(jobId) {
     setView('logs')
@@ -215,6 +243,14 @@ export default function RunDetail({ runId, workflows, onClose, onOpenRun }) {
       {wsDown && run && !isTerminal && (
         <div className="banner banner--warn">
           Live stream lost — falling back to polling. Output may lag a couple of seconds.
+        </div>
+      )}
+      {fileChanged && run && (
+        <div className="banner banner--warn">
+          <span>{run.workflowFile} has changed on disk since this run.</span>
+          <button className="btn" onClick={rerun} disabled={busy}>
+            Re-run with same inputs
+          </button>
         </div>
       )}
       {error && <p className="error">{error}</p>}

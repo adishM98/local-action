@@ -148,7 +148,7 @@ export default function RunsView({
             <p className="empty-state__heading">No runs yet</p>
             <p>
               {workflow
-                ? 'Trigger a run with the "Run workflow ▾" button above to see activity here.'
+                ? 'Trigger a run with the "Run workflow" button above to see activity here.'
                 : 'Pick a workflow from the sidebar and trigger a run to see activity here.'}
             </p>
           </div>

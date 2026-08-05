@@ -717,3 +717,62 @@ func TestAPI_ResetRunHistory(t *testing.T) {
 		t.Fatalf("expected run history cleared, got %d runs", len(runList))
 	}
 }
+
+func TestAPI_WorkflowFileMTime(t *testing.T) {
+	stubDir := t.TempDir()
+	stubPath := filepath.Join(stubDir, "fake-act.sh")
+	if err := os.WriteFile(stubPath, []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
+		t.Fatalf("write stub: %v", err)
+	}
+	mux, _, _ := newTestRouter(t, stubPath)
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	repo := t.TempDir()
+	wfDir := filepath.Join(repo, ".github", "workflows")
+	if err := os.MkdirAll(wfDir, 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(wfDir, "ci.yml"), []byte("name: CI\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n"), 0644); err != nil {
+		t.Fatalf("write workflow: %v", err)
+	}
+
+	resp, err := http.Get(server.URL + "/api/workflow-file-mtime?repoPath=" + repo + "&workflowFile=.github/workflows/ci.yml")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	var got struct {
+		MTime int64 `json:"mtime"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got.MTime == 0 {
+		t.Error("expected a non-zero mtime")
+	}
+}
+
+func TestAPI_WorkflowFileMTime_RejectsPathEscape(t *testing.T) {
+	stubDir := t.TempDir()
+	stubPath := filepath.Join(stubDir, "fake-act.sh")
+	if err := os.WriteFile(stubPath, []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
+		t.Fatalf("write stub: %v", err)
+	}
+	mux, _, _ := newTestRouter(t, stubPath)
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	repo := t.TempDir()
+	resp, err := http.Get(server.URL + "/api/workflow-file-mtime?repoPath=" + repo + "&workflowFile=../../etc/passwd")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for a path escape, got %d", resp.StatusCode)
+	}
+}

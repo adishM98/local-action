@@ -662,8 +662,13 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   padding: 8px 12px;
   margin-bottom: 12px;
   font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 .banner--warn { border-color: var(--yellow); color: var(--yellow); background: rgba(210, 153, 34, 0.08); }
+.banner--warn .btn { color: var(--text); flex-shrink: 0; }
 
 /* No overflow:hidden here — it used to clip the row's overflow-menu
    dropdown (position:absolute, extends below the row) for any row near

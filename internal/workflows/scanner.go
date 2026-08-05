@@ -214,16 +214,49 @@ func ScanWorkflows(repoPath string) ([]WorkflowInfo, error) {
 // crafted "../../etc/passwd"-style value could read any file the process
 // can see.
 func ReadWorkflowSource(repoPath, workflowFile string) (string, error) {
-	dir := filepath.Clean(filepath.Join(repoPath, ".github", "workflows"))
-	full := filepath.Clean(filepath.Join(repoPath, workflowFile))
-	if full != dir && !strings.HasPrefix(full, dir+string(filepath.Separator)) {
-		return "", fmt.Errorf("workflow file is outside the workflows directory: %s", workflowFile)
+	full, err := resolveWorkflowPath(repoPath, workflowFile)
+	if err != nil {
+		return "", err
 	}
 	data, err := os.ReadFile(full)
 	if err != nil {
 		return "", err
 	}
 	return string(data), nil
+}
+
+// WorkflowFileMTime returns the workflow file's last-modified time as Unix
+// seconds — used to detect edits made outside the app while a run's detail
+// view is open (see internal/httpapi's /api/workflow-file-mtime), by
+// comparing against that run's created_at. Deliberately mtime rather than a
+// content hash: no need to read the whole file just to answer "has
+// anything happened to this since the run started," and a false positive
+// from a touch-without-real-edit is harmless — it's a nudge to check, not a
+// guarantee.
+func WorkflowFileMTime(repoPath, workflowFile string) (int64, error) {
+	full, err := resolveWorkflowPath(repoPath, workflowFile)
+	if err != nil {
+		return 0, err
+	}
+	info, err := os.Stat(full)
+	if err != nil {
+		return 0, err
+	}
+	return info.ModTime().Unix(), nil
+}
+
+// resolveWorkflowPath joins and validates a client-supplied workflowFile
+// against repoPath, rejecting anything that resolves outside the
+// .github/workflows directory — workflowFile is picked from scan results
+// but still client-controlled on the wire, so a crafted
+// "../../etc/passwd"-style value must not escape to an arbitrary path.
+func resolveWorkflowPath(repoPath, workflowFile string) (string, error) {
+	dir := filepath.Clean(filepath.Join(repoPath, ".github", "workflows"))
+	full := filepath.Clean(filepath.Join(repoPath, workflowFile))
+	if full != dir && !strings.HasPrefix(full, dir+string(filepath.Separator)) {
+		return "", fmt.Errorf("workflow file is outside the workflows directory: %s", workflowFile)
+	}
+	return full, nil
 }
 
 func ParseWorkflowFile(path string) (WorkflowInfo, error) {

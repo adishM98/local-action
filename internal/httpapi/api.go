@@ -278,6 +278,17 @@ func NewRouter(db *sql.DB, key []byte, engine *runs.Engine, hub *ws.Hub, term *t
 		writeJSON(w, http.StatusOK, map[string]string{"source": source})
 	})
 
+	mux.HandleFunc("GET /api/workflow-file-mtime", func(w http.ResponseWriter, r *http.Request) {
+		repoPath := r.URL.Query().Get("repoPath")
+		workflowFile := r.URL.Query().Get("workflowFile")
+		mtime, err := workflows.WorkflowFileMTime(repoPath, workflowFile)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]int64{"mtime": mtime})
+	})
+
 	mux.HandleFunc("GET /api/workflow-categories", func(w http.ResponseWriter, r *http.Request) {
 		repoPath := r.URL.Query().Get("repoPath")
 		categories, err := workflows.GetWorkflowCategories(db, repoPath)

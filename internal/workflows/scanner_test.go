@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func writeWorkflow(t *testing.T, repoPath, filename, content string) {
@@ -1136,6 +1137,44 @@ func TestReadWorkflowSource_RejectsPathEscape(t *testing.T) {
 	writeWorkflow(t, repo, "ci.yml", "name: CI\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n")
 
 	if _, err := ReadWorkflowSource(repo, "../../etc/passwd"); err == nil {
+		t.Error("expected an error escaping the workflows directory, got nil")
+	}
+}
+
+func TestWorkflowFileMTime(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", "name: CI\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n")
+
+	before, err := WorkflowFileMTime(repo, ".github/workflows/ci.yml")
+	if err != nil {
+		t.Fatalf("WorkflowFileMTime: %v", err)
+	}
+	if before == 0 {
+		t.Fatal("expected a non-zero mtime")
+	}
+
+	// Bump mtime forward so a same-second edit in a fast test run still
+	// registers as a change.
+	future := time.Now().Add(2 * time.Hour)
+	path := filepath.Join(repo, ".github", "workflows", "ci.yml")
+	if err := os.Chtimes(path, future, future); err != nil {
+		t.Fatalf("chtimes: %v", err)
+	}
+
+	after, err := WorkflowFileMTime(repo, ".github/workflows/ci.yml")
+	if err != nil {
+		t.Fatalf("WorkflowFileMTime after edit: %v", err)
+	}
+	if after <= before {
+		t.Errorf("expected mtime to advance after edit: before=%d after=%d", before, after)
+	}
+}
+
+func TestWorkflowFileMTime_RejectsPathEscape(t *testing.T) {
+	repo := t.TempDir()
+	writeWorkflow(t, repo, "ci.yml", "name: CI\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest\n")
+
+	if _, err := WorkflowFileMTime(repo, "../../etc/passwd"); err == nil {
 		t.Error("expected an error escaping the workflows directory, got nil")
 	}
 }
