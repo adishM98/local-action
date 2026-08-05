@@ -845,8 +845,6 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 
 .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; font-size: 13px; }
 .field > span { font-weight: 600; }
-.field__label-row { display: flex; align-items: center; justify-content: space-between; }
-.field__label-row > span { font-weight: 600; }
 .field small { color: var(--muted); }
 .field input, .field select, .field-row select, .secrets-page input, .secrets-page select {
   background: var(--bg);
@@ -865,15 +863,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   font-size: 13px;
   font-family: var(--mono);
   resize: vertical;
-  transition: filter 100ms ease;
 }
-/* Blur rather than -webkit-text-security: dots — the latter is a
-   non-standard WebKit property Firefox silently ignores entirely, which
-   would mean "hidden" secretly not hiding anything for anyone testing or
-   using this app in Firefox. A CSS filter is standard and blurs the same
-   way everywhere. Typing/editing still works underneath; it just isn't
-   legible on screen (e.g. mid screen-share) until "Show" is clicked. */
-.secret-value-input--hidden { filter: blur(5px); }
 
 .storage-options { display: flex; gap: 10px; flex-wrap: wrap; }
 .storage-card {

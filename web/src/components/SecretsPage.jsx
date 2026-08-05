@@ -11,7 +11,6 @@ export default function SecretsPage({ repoPath, workflows, initialWorkflowFilter
   const [scope, setScope] = useState(initialWorkflowFilter || '')
   const [error, setError] = useState(null)
   const [editing, setEditing] = useState(null) // {key, workflowFile} | null
-  const [revealed, setRevealed] = useState(false)
   const [revealable, setRevealable] = useState(true) // this entry's saved choice: viewable/editable later, or write-only
   const valueRef = useRef(null)
 
@@ -35,7 +34,6 @@ export default function SecretsPage({ repoPath, workflows, initialWorkflowFilter
     setName('')
     setValue('')
     setScope(initialWorkflowFilter || '')
-    setRevealed(false)
     setRevealable(true)
   }
 
@@ -53,7 +51,6 @@ export default function SecretsPage({ repoPath, workflows, initialWorkflowFilter
     setScope(entry.workflowFile || '')
     setValue('')
     setError(null)
-    setRevealed(false)
     setRevealable(entry.revealable)
     valueRef.current?.focus()
     if (!entry.revealable) return // write-only — nothing to fetch, by design
@@ -107,7 +104,6 @@ export default function SecretsPage({ repoPath, workflows, initialWorkflowFilter
     setName(detectedName)
     setScope(filter)
     setValue('')
-    setRevealed(false)
     setRevealable(true)
     valueRef.current?.focus()
   }
@@ -232,25 +228,15 @@ export default function SecretsPage({ repoPath, workflows, initialWorkflowFilter
         </div>
       )}
       <div className="field">
-        <div className="field__label-row">
-          <span>{noun === 'secret' ? 'Secret value' : 'Variable value'}</span>
-          {kind === 'secret' && (
-            <button type="button" className="linklike" onClick={() => setRevealed((r) => !r)}>
-              {revealed ? 'Hide' : 'Show'}
-            </button>
-          )}
-        </div>
+        <span>{noun === 'secret' ? 'Secret value' : 'Variable value'}</span>
         <textarea
           ref={valueRef}
-          className={`secret-value-input${kind === 'secret' && !revealed ? ' secret-value-input--hidden' : ''}`}
+          className="secret-value-input"
           rows={3}
           placeholder={noun === 'secret' ? 'Paste your secret here…' : 'Enter the value…'}
           value={value}
           onChange={(e) => setValue(e.target.value)}
         />
-        {kind === 'secret' && !revealed && (
-          <small>Blurred on screen — click "Show" before a screen share, or if you just want to double-check it.</small>
-        )}
       </div>
       <div className="field">
         <span>Scope</span>
