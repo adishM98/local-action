@@ -42,4 +42,5 @@ export const api = {
   checkForUpdate: () => request('GET', '/api/update-check'),
   getVersionMigration: () => request('GET', '/api/version-migration'),
   resolveVersionMigration: (action) => request('POST', '/api/version-migration/resolve', { action }),
+  resetRunHistory: () => request('POST', '/api/reset-run-history'),
 }

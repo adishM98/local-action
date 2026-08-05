@@ -816,6 +816,8 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 .btn:disabled { opacity: 0.5; cursor: default; }
 .btn--primary { background: #238636; border-color: #2ea043; color: #fff; }
 .btn--primary:hover { background: #2ea043; }
+.btn--danger { background: var(--red); border-color: var(--red); color: #fff; }
+.btn--danger:hover { opacity: 0.9; }
 .btn--block { width: 100%; }
 
 .linklike {
@@ -1120,6 +1122,14 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 
 /* ── Secrets page ────────────────────────────────────── */
 .secrets-page { max-width: 760px; }
+
+/* ── Settings page ────────────────────────────────────── */
+.settings-page { max-width: 760px; }
+.settings-section { margin-top: 24px; padding: 18px 20px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); }
+.settings-section h3 { margin: 0 0 8px; font-size: 14px; }
+.settings-section__desc { margin: 0 0 14px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.settings-confirm { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text); }
+.settings-result { margin: 12px 0 0; color: var(--green); font-size: 13px; }
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin: 16px 0; }
 .tab {
   background: none;

@@ -6,6 +6,7 @@ import Overview from './components/Overview.jsx'
 import RunsView from './components/RunsView.jsx'
 import RunDetail from './components/RunDetail.jsx'
 import SecretsPage from './components/SecretsPage.jsx'
+import SettingsPage from './components/SettingsPage.jsx'
 import Drawer from './components/Drawer.jsx'
 import TerminalPanel from './components/TerminalPanel.jsx'
 import VersionMigrationModal from './components/VersionMigrationModal.jsx'
@@ -192,6 +193,7 @@ export default function App() {
               initialWorkflowFilter={view.workflowFile || ''}
             />
           )}
+          {view.name === 'settings' && <SettingsPage />}
         </main>
       </div>
       {drawerRunId && (

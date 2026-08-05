@@ -181,3 +181,38 @@ func TestGetRunLogs_EmptyMarshalsAsEmptyArray(t *testing.T) {
 		t.Fatalf("expected empty GetRunLogs to marshal as [], got %s", b)
 	}
 }
+
+func TestClearAllRuns(t *testing.T) {
+	db, err := db.OpenDB(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+
+	id, err := CreateRun(db, Run{RepoPath: "/repo/a", WorkflowFile: "a.yml", Event: "push", Inputs: "{}", Status: StatusSuccess, CreatedAt: time.Now().Unix()})
+	if err != nil {
+		t.Fatalf("create run: %v", err)
+	}
+	if err := AppendRunLog(db, id, 1, "line one"); err != nil {
+		t.Fatalf("append log: %v", err)
+	}
+
+	if err := ClearAllRuns(db); err != nil {
+		t.Fatalf("clear all runs: %v", err)
+	}
+
+	runList, err := ListRuns(db, "/repo/a")
+	if err != nil {
+		t.Fatalf("list runs: %v", err)
+	}
+	if len(runList) != 0 {
+		t.Fatalf("expected no runs after clear, got %d", len(runList))
+	}
+	logs, err := GetRunLogs(db, id)
+	if err != nil {
+		t.Fatalf("get logs: %v", err)
+	}
+	if len(logs) != 0 {
+		t.Fatalf("expected no logs after clear, got %d", len(logs))
+	}
+}

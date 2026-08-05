@@ -65,6 +65,17 @@ func UpdateRunStatus(db *sql.DB, id int64, status RunStatus, startedAt, finished
 	return err
 }
 
+// ClearAllRuns deletes every run and its logs, across all repos. Used both
+// by the version-migration "start fresh" choice and the settings page's
+// manual reset — same operation, two different triggers.
+func ClearAllRuns(db *sql.DB) error {
+	if _, err := db.Exec(`DELETE FROM run_logs`); err != nil {
+		return err
+	}
+	_, err := db.Exec(`DELETE FROM runs`)
+	return err
+}
+
 func AppendRunLog(db *sql.DB, runID int64, lineNo int, text string) error {
 	_, err := db.Exec(
 		`INSERT INTO run_logs (run_id, line_no, text) VALUES (?, ?, ?)`,

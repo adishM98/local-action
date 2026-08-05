@@ -78,11 +78,7 @@ func NewRouter(db *sql.DB, key []byte, engine *runs.Engine, hub *ws.Hub, term *t
 			return
 		}
 		if body.Action == "clear" {
-			if _, err := db.Exec(`DELETE FROM run_logs`); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			if _, err := db.Exec(`DELETE FROM runs`); err != nil {
+			if err := runs.ClearAllRuns(db); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -92,6 +88,16 @@ func NewRouter(db *sql.DB, key []byte, engine *runs.Engine, hub *ws.Hub, term *t
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	// Manual equivalent of the "clear" choice above, reachable any time from
+	// the settings page rather than only right after a version bump.
+	mux.HandleFunc("POST /api/reset-run-history", func(w http.ResponseWriter, r *http.Request) {
+		if err := runs.ClearAllRuns(db); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 		w.WriteHeader(http.StatusNoContent)
 	})

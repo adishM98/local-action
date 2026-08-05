@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { Sun, Moon, Monitor, Check, ArrowUpCircle, X } from 'lucide-react'
+import { Sun, Moon, Monitor, Check, ArrowUpCircle, X, Settings } from 'lucide-react'
 import HealthItem from './HealthItem.jsx'
 import { api } from '../api.js'
 
@@ -134,6 +134,9 @@ export default function RepoHeader({ health, onRecheck, onNavigate }) {
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
+        <button className="health__item" title="Settings" onClick={() => onNavigate({ name: 'settings' })}>
+          <Settings size={18} />
+        </button>
         <HealthItem label="Docker" ok={health?.dockerOK} error={health?.dockerError} onClick={onRecheck} />
         {updateInfo?.currentVersion && (
           <span className="app-version" title="Running local-action version">

@@ -689,3 +689,31 @@ func TestAPI_VersionMigration_KeepResolvesWithoutClearingRuns(t *testing.T) {
 		t.Fatalf("expected last_version updated to 0.9.1, got %q", last)
 	}
 }
+
+func TestAPI_ResetRunHistory(t *testing.T) {
+	stubDir := t.TempDir()
+	stubPath := filepath.Join(stubDir, "fake-act.sh")
+	if err := os.WriteFile(stubPath, []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
+		t.Fatalf("write stub: %v", err)
+	}
+	mux, database, _ := newTestRouter(t, stubPath)
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	if _, err := runs.CreateRun(database, runs.Run{RepoPath: "/r", WorkflowFile: "ci.yml", Event: "push", Inputs: "{}", Status: runs.StatusSuccess, CreatedAt: time.Now().Unix()}); err != nil {
+		t.Fatalf("seed run: %v", err)
+	}
+
+	resp, err := http.Post(server.URL+"/api/reset-run-history", "application/json", nil)
+	if err != nil || resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("reset: err=%v status=%v", err, resp.StatusCode)
+	}
+
+	runList, err := runs.ListRuns(database, "/r")
+	if err != nil {
+		t.Fatalf("list runs: %v", err)
+	}
+	if len(runList) != 0 {
+		t.Fatalf("expected run history cleared, got %d runs", len(runList))
+	}
+}
