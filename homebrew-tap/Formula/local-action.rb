@@ -10,12 +10,12 @@ class LocalAction < Formula
 
   on_macos do
     on_arm do
-      url "https://github.com/adishM98/local-action/releases/download/v0.9.2/local-action_0.9.2_darwin_arm64"
-      sha256 "36c74fcc1ec5058d78221f59d36f89ed55705404c59470cd0cbb1bc1f72aafbd"
+      url "https://github.com/adishM98/local-action/releases/download/v0.9.3/local-action_0.9.3_darwin_arm64"
+      sha256 "e7fe2d071282f2be8fa7834a911e6f885f864f5238aa6e024f02109d59107d4c"
     end
     on_intel do
-      url "https://github.com/adishM98/local-action/releases/download/v0.9.2/local-action_0.9.2_darwin_amd64"
-      sha256 "2385ba35772bdc0fb971f4e1c5b66e2b46229dc3f87469d17376a714669dddec"
+      url "https://github.com/adishM98/local-action/releases/download/v0.9.3/local-action_0.9.3_darwin_amd64"
+      sha256 "3a722766b94d640b61cd54fb036207645a55f97934f6a5fbbf909a4fe2b665bc"
     end
   end
 
