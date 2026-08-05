@@ -845,6 +845,8 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 
 .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; font-size: 13px; }
 .field > span { font-weight: 600; }
+.field__label-row { display: flex; align-items: center; justify-content: space-between; }
+.field__label-row > span { font-weight: 600; }
 .field small { color: var(--muted); }
 .field input, .field select, .field-row select, .secrets-page input, .secrets-page select {
   background: var(--bg);
@@ -854,6 +856,49 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   padding: 5px 10px;
   font-size: 13px;
 }
+.secret-value-input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: var(--mono);
+  resize: vertical;
+  transition: filter 100ms ease;
+}
+/* Blur rather than -webkit-text-security: dots — the latter is a
+   non-standard WebKit property Firefox silently ignores entirely, which
+   would mean "hidden" secretly not hiding anything for anyone testing or
+   using this app in Firefox. A CSS filter is standard and blurs the same
+   way everywhere. Typing/editing still works underneath; it just isn't
+   legible on screen (e.g. mid screen-share) until "Show" is clicked. */
+.secret-value-input--hidden { filter: blur(5px); }
+
+.storage-options { display: flex; gap: 10px; flex-wrap: wrap; }
+.storage-card {
+  flex: 1;
+  min-width: 220px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+.storage-card:hover { border-color: var(--muted); }
+.storage-card input[type='radio'] { margin-top: 3px; flex-shrink: 0; }
+.storage-card__icon { margin-top: 2px; flex-shrink: 0; color: var(--muted); }
+.storage-card__body { display: flex; flex-direction: column; gap: 2px; }
+.storage-card__title { font-weight: 600; font-size: 13px; }
+.storage-card__desc { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.storage-card__warning { color: var(--yellow); font-weight: 600; display: inline-flex; align-items: center; gap: 3px; }
+.storage-card--active { background: var(--panel-2); border-color: var(--text); }
+.storage-card--active .storage-card__icon { color: var(--text); }
+.storage-card--warn.storage-card--active { border-color: var(--yellow); background: rgba(210, 153, 34, 0.08); }
+.storage-card--warn.storage-card--active .storage-card__icon { color: var(--yellow); }
 /* WebKit (the DMG app's embedded webview) renders <select> as a glossy
    native Aqua control and ignores most of its box styling unless appearance
    is explicitly reset — Chrome doesn't have this quirk, which is why this
@@ -1128,6 +1173,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 
 /* ── Secrets page ────────────────────────────────────── */
 .secrets-page { max-width: 760px; }
+.secrets-page h3 { margin: 24px 0 12px; }
 
 /* ── Settings page ────────────────────────────────────── */
 .settings-page { max-width: 760px; }
@@ -1158,6 +1204,8 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   padding: 6px 10px;
 }
 .secret-table td { border-bottom: 1px solid var(--border); padding: 8px 10px; font-family: var(--mono); font-size: 13px; }
+.secret-table__actions { display: flex; gap: 14px; }
+.secrets-form__actions { display: flex; gap: 8px; }
 
 .scope-badge {
   display: inline-block;
@@ -1169,6 +1217,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   color: var(--muted);
 }
 .scope-badge--wf { color: var(--text); border-color: var(--text); font-weight: 600; }
+.scope-badge--write-only { margin-left: 8px; color: var(--yellow); border-color: var(--yellow); }
 
 .detected-chips { margin-bottom: 16px; font-size: 13px; }
 .detected-chips > span { color: var(--muted); }

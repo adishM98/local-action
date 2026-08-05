@@ -164,6 +164,26 @@ func NewRouter(db *sql.DB, key []byte, engine *runs.Engine, hub *ws.Hub, term *t
 		writeJSON(w, http.StatusOK, entries)
 	})
 
+	// Lets the edit form pre-fill a stored value instead of a blind
+	// overwrite. GitHub's own hosted UI never shows a saved secret again —
+	// but that guards against a different threat model (org admins,
+	// multi-tenant breach blast radius) than a single-user local tool:
+	// here, the encryption key and the encrypted value both already live
+	// on the same disk as whoever's asking, so anyone who could decrypt it
+	// via this endpoint could already decrypt it directly from those files.
+	mux.HandleFunc("GET /api/secrets/value", func(w http.ResponseWriter, r *http.Request) {
+		repoPath := r.URL.Query().Get("repoPath")
+		kind := secrets.SecretKind(r.URL.Query().Get("kind"))
+		name := r.URL.Query().Get("key")
+		workflowFile := r.URL.Query().Get("workflowFile")
+		value, err := secrets.GetSecretValue(db, key, repoPath, kind, name, workflowFile)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"value": value})
+	})
+
 	mux.HandleFunc("POST /api/secrets", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			RepoPath     string             `json:"repoPath"`
@@ -171,12 +191,13 @@ func NewRouter(db *sql.DB, key []byte, engine *runs.Engine, hub *ws.Hub, term *t
 			Key          string             `json:"key"`
 			Value        string             `json:"value"`
 			WorkflowFile string             `json:"workflowFile"`
+			Revealable   bool               `json:"revealable"`
 		}
 		if err := readJSON(r, &body); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if err := secrets.UpsertSecret(db, key, body.RepoPath, body.Kind, body.Key, body.Value, body.WorkflowFile); err != nil {
+		if err := secrets.UpsertSecret(db, key, body.RepoPath, body.Kind, body.Key, body.Value, body.WorkflowFile, body.Revealable); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}

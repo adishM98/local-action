@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS secrets (
   key TEXT NOT NULL,
   workflow_file TEXT NOT NULL DEFAULT '',
   value_encrypted BLOB NOT NULL,
+  revealable INTEGER NOT NULL DEFAULT 1,
   PRIMARY KEY (repo_path, kind, key, workflow_file)
 );
 
@@ -88,7 +89,31 @@ func OpenDB(path string) (*sql.DB, error) {
 		db.Close()
 		return nil, err
 	}
+	if err := migrateSecretsRevealable(db); err != nil {
+		db.Close()
+		return nil, err
+	}
 	return db, nil
+}
+
+// migrateSecretsRevealable adds revealable to a pre-existing secrets table.
+// Existing rows default to 1 (revealable) — they were saved back when
+// there was no write-only choice at all, under the assumption a value
+// could always be viewed again, so upgrading silently makes something
+// previously-viewable stop being viewable would be a surprising regression,
+// not a security improvement.
+func migrateSecretsRevealable(db *sql.DB) error {
+	var count int
+	if err := db.QueryRow(
+		`SELECT COUNT(*) FROM pragma_table_info('secrets') WHERE name = 'revealable'`,
+	).Scan(&count); err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+	_, err := db.Exec(`ALTER TABLE secrets ADD COLUMN revealable INTEGER NOT NULL DEFAULT 1`)
+	return err
 }
 
 // migrateRunsBranchCommit adds branch/commit_sha to a pre-existing runs

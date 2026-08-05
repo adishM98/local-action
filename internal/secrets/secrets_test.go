@@ -17,7 +17,7 @@ func TestSecrets_UpsertListGetDelete(t *testing.T) {
 
 	key := make([]byte, KeySize)
 
-	if err := UpsertSecret(db, key, "/repo/a", KindSecret, "TOKEN", "abc123", ""); err != nil {
+	if err := UpsertSecret(db, key, "/repo/a", KindSecret, "TOKEN", "abc123", "", true); err != nil {
 		t.Fatalf("upsert: %v", err)
 	}
 
@@ -38,7 +38,7 @@ func TestSecrets_UpsertListGetDelete(t *testing.T) {
 	}
 
 	// overwrite
-	if err := UpsertSecret(db, key, "/repo/a", KindSecret, "TOKEN", "xyz789", ""); err != nil {
+	if err := UpsertSecret(db, key, "/repo/a", KindSecret, "TOKEN", "xyz789", "", true); err != nil {
 		t.Fatalf("re-upsert: %v", err)
 	}
 	value, _ = GetSecretValue(db, key, "/repo/a", KindSecret, "TOKEN", "")
@@ -47,7 +47,7 @@ func TestSecrets_UpsertListGetDelete(t *testing.T) {
 	}
 
 	// scoping: same key name under a different repo path is independent
-	if err := UpsertSecret(db, key, "/repo/b", KindSecret, "TOKEN", "other-repo-value", ""); err != nil {
+	if err := UpsertSecret(db, key, "/repo/b", KindSecret, "TOKEN", "other-repo-value", "", true); err != nil {
 		t.Fatalf("upsert repo b: %v", err)
 	}
 	valueB, _ := GetSecretValue(db, key, "/repo/b", KindSecret, "TOKEN", "")
@@ -110,7 +110,7 @@ func TestSecretsForRun_WorkflowOverridesRepoWide(t *testing.T) {
 	// workflow-specific BAZ for a DIFFERENT workflow.
 	mustUpsert := func(name, value, workflowFile string) {
 		t.Helper()
-		if err := UpsertSecret(db, key, "/repo/a", KindSecret, name, value, workflowFile); err != nil {
+		if err := UpsertSecret(db, key, "/repo/a", KindSecret, name, value, workflowFile, true); err != nil {
 			t.Fatalf("upsert %s: %v", name, err)
 		}
 	}

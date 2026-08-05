@@ -98,7 +98,6 @@ export default function RunsView({
       {health && health.dockerOK === false && (
         <div className="banner banner--warn">Docker is not running — workflow runs will fail.</div>
       )}
-      {runsError && <p className="error">{runsError}</p>}
       {!workflowFile && visible.length > 0 && <RecentActivity runs={visible} wfName={wfName} />}
       {visible.length > 0 && <StatCards runs={visible} />}
       {visible.length > 0 && (

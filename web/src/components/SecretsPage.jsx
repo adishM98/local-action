@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Lock, Unlock, TriangleAlert } from 'lucide-react'
 import { api } from '../api.js'
 
 export default function SecretsPage({ repoPath, workflows, initialWorkflowFilter }) {
@@ -9,6 +10,9 @@ export default function SecretsPage({ repoPath, workflows, initialWorkflowFilter
   const [value, setValue] = useState('')
   const [scope, setScope] = useState(initialWorkflowFilter || '')
   const [error, setError] = useState(null)
+  const [editing, setEditing] = useState(null) // {key, workflowFile} | null
+  const [revealed, setRevealed] = useState(false)
+  const [revealable, setRevealable] = useState(true) // this entry's saved choice: viewable/editable later, or write-only
   const valueRef = useRef(null)
 
   async function load() {
@@ -23,14 +27,49 @@ export default function SecretsPage({ repoPath, workflows, initialWorkflowFilter
 
   useEffect(() => {
     load()
+    cancelEdit()
   }, [repoPath, kind])
+
+  function cancelEdit() {
+    setEditing(null)
+    setName('')
+    setValue('')
+    setScope(initialWorkflowFilter || '')
+    setRevealed(false)
+    setRevealable(true)
+  }
+
+  // Name and scope are locked while editing: they're the identity
+  // upsertSecret matches on, so changing either here would silently create
+  // a second entry instead of updating this one. The write-only/revealable
+  // choice itself stays editable — flipping it just changes what happens to
+  // *this save*, not history: turning a revealable entry write-only from
+  // here on is a legitimate tightening, and turning a write-only entry
+  // revealable only ever exposes whatever new value you're about to type in
+  // (its old value was never fetched, so there's nothing retroactive to leak).
+  async function startEdit(entry) {
+    setEditing({ key: entry.key, workflowFile: entry.workflowFile || '' })
+    setName(entry.key)
+    setScope(entry.workflowFile || '')
+    setValue('')
+    setError(null)
+    setRevealed(false)
+    setRevealable(entry.revealable)
+    valueRef.current?.focus()
+    if (!entry.revealable) return // write-only — nothing to fetch, by design
+    try {
+      const result = await api.getSecretValue(repoPath, kind, entry.key, entry.workflowFile || '')
+      setValue(result?.value || '')
+    } catch (err) {
+      setError(`Couldn't load the current value: ${err.message}`)
+    }
+  }
 
   async function save() {
     setError(null)
     try {
-      await api.upsertSecret(repoPath, kind, name, value, scope)
-      setName('')
-      setValue('')
+      await api.upsertSecret(repoPath, kind, name, value, scope, kind === 'secret' ? revealable : true)
+      cancelEdit()
       load()
     } catch (err) {
       setError(err.message)
@@ -41,6 +80,7 @@ export default function SecretsPage({ repoPath, workflows, initialWorkflowFilter
     setError(null)
     try {
       await api.deleteSecret(repoPath, kind, entry.key, entry.workflowFile || '')
+      if (editing?.key === entry.key && editing.workflowFile === (entry.workflowFile || '')) cancelEdit()
       load()
     } catch (err) {
       setError(err.message)
@@ -63,9 +103,12 @@ export default function SecretsPage({ repoPath, workflows, initialWorkflowFilter
   const chips = detected.filter((n) => !storedNames.has(n))
 
   function quickAdd(detectedName) {
+    setEditing(null)
     setName(detectedName)
     setScope(filter)
     setValue('')
+    setRevealed(false)
+    setRevealable(true)
     valueRef.current?.focus()
   }
 
@@ -120,7 +163,14 @@ export default function SecretsPage({ repoPath, workflows, initialWorkflowFilter
           <tbody>
             {visible.map((entry) => (
               <tr key={`${entry.key}|${entry.workflowFile}`}>
-                <td>{entry.key}</td>
+                <td>
+                  {entry.key}
+                  {kind === 'secret' && !entry.revealable && (
+                    <span className="scope-badge scope-badge--write-only" title="Saved as write-only — the value can't be viewed again, only overwritten">
+                      Write-only
+                    </span>
+                  )}
+                </td>
                 <td>
                   {entry.workflowFile ? (
                     <span className="scope-badge scope-badge--wf" title={entry.workflowFile}>
@@ -130,7 +180,10 @@ export default function SecretsPage({ repoPath, workflows, initialWorkflowFilter
                     <span className="scope-badge">Repository</span>
                   )}
                 </td>
-                <td>
+                <td className="secret-table__actions">
+                  <button className="linklike" onClick={() => startEdit(entry)}>
+                    Edit
+                  </button>
                   <button className="linklike" onClick={() => remove(entry)}>
                     Delete
                   </button>
@@ -140,37 +193,82 @@ export default function SecretsPage({ repoPath, workflows, initialWorkflowFilter
           </tbody>
         </table>
       )}
-      <h3>New {noun}</h3>
+      <h3>{editing ? `Edit ${noun}` : `New ${noun}`}</h3>
       <div className="field">
-        <span>Name</span>
-        <input placeholder="KEY" value={name} onChange={(e) => setName(e.target.value)} />
-      </div>
-      <div className="field">
-        <span>Value</span>
+        <span>{noun === 'secret' ? 'Secret name' : 'Variable name'}</span>
         <input
+          placeholder={noun === 'secret' ? 'e.g. AWS_ACCESS_KEY_ID' : 'e.g. NODE_VERSION'}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          disabled={Boolean(editing)}
+        />
+      </div>
+      {kind === 'secret' && (
+        <div className="field">
+          <span>Storage</span>
+          <div className="storage-options">
+            <label className={`storage-card${revealable ? ' storage-card--active' : ''}`}>
+              <input type="radio" name="storage" checked={revealable} onChange={() => setRevealable(true)} />
+              <Unlock size={16} className="storage-card__icon" />
+              <span className="storage-card__body">
+                <span className="storage-card__title">Editable</span>
+                <span className="storage-card__desc">View and edit this secret later.</span>
+              </span>
+            </label>
+            <label className={`storage-card storage-card--warn${!revealable ? ' storage-card--active' : ''}`}>
+              <input type="radio" name="storage" checked={!revealable} onChange={() => setRevealable(false)} />
+              <Lock size={16} className="storage-card__icon" />
+              <span className="storage-card__body">
+                <span className="storage-card__title">Write-only (GitHub-style)</span>
+                <span className="storage-card__desc">
+                  <span className="storage-card__warning">
+                    <TriangleAlert size={12} /> The value cannot be viewed after saving.
+                  </span>{' '}
+                  You can only replace it.
+                </span>
+              </span>
+            </label>
+          </div>
+        </div>
+      )}
+      <div className="field">
+        <div className="field__label-row">
+          <span>{noun === 'secret' ? 'Secret value' : 'Variable value'}</span>
+          {kind === 'secret' && (
+            <button type="button" className="linklike" onClick={() => setRevealed((r) => !r)}>
+              {revealed ? 'Hide' : 'Show'}
+            </button>
+          )}
+        </div>
+        <textarea
           ref={valueRef}
-          placeholder="value (write-only after save)"
+          className={`secret-value-input${kind === 'secret' && !revealed ? ' secret-value-input--hidden' : ''}`}
+          rows={3}
+          placeholder={noun === 'secret' ? 'Paste your secret here…' : 'Enter the value…'}
           value={value}
           onChange={(e) => setValue(e.target.value)}
         />
+        {kind === 'secret' && !revealed && (
+          <small>Blurred on screen — click "Show" before a screen share, or if you just want to double-check it.</small>
+        )}
       </div>
       <div className="field">
         <span>Scope</span>
         <label>
-          <input type="radio" checked={scope === ''} onChange={() => setScope('')} /> All workflows in this
-          repo
+          <input type="radio" checked={scope === ''} onChange={() => setScope('')} disabled={Boolean(editing)} /> Entire
+          repository
         </label>
         <label>
           <input
             type="radio"
             checked={scope !== ''}
-            disabled={workflows.length === 0}
+            disabled={Boolean(editing) || workflows.length === 0}
             onChange={() => setScope(workflows[0]?.file || '')}
           />{' '}
-          Specific workflow
+          Only this workflow
         </label>
         {scope !== '' && (
-          <select value={scope} onChange={(e) => setScope(e.target.value)}>
+          <select value={scope} onChange={(e) => setScope(e.target.value)} disabled={Boolean(editing)}>
             {workflows.map((w) => (
               <option key={w.file} value={w.file}>
                 {w.name}
@@ -179,9 +277,16 @@ export default function SecretsPage({ repoPath, workflows, initialWorkflowFilter
           </select>
         )}
       </div>
-      <button className="btn btn--primary" onClick={save} disabled={!name}>
-        Add {noun}
-      </button>
+      <div className="secrets-form__actions">
+        <button className="btn btn--primary" onClick={save} disabled={!name || (editing && !value)}>
+          {editing ? `Update ${noun}` : `Save ${noun}`}
+        </button>
+        {editing && (
+          <button className="btn" onClick={cancelEdit}>
+            Cancel
+          </button>
+        )}
+      </div>
     </div>
   )
 }

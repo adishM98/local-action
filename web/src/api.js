@@ -17,8 +17,13 @@ export const api = {
   repoInfo: (repoPath) => request('GET', `/api/repo-info?repoPath=${encodeURIComponent(repoPath)}`),
   listSecrets: (repoPath, kind) =>
     request('GET', `/api/secrets?repoPath=${encodeURIComponent(repoPath)}&kind=${kind}`),
-  upsertSecret: (repoPath, kind, key, value, workflowFile = '') =>
-    request('POST', '/api/secrets', { repoPath, kind, key, value, workflowFile }),
+  getSecretValue: (repoPath, kind, key, workflowFile = '') =>
+    request(
+      'GET',
+      `/api/secrets/value?repoPath=${encodeURIComponent(repoPath)}&kind=${kind}&key=${encodeURIComponent(key)}&workflowFile=${encodeURIComponent(workflowFile)}`,
+    ),
+  upsertSecret: (repoPath, kind, key, value, workflowFile = '', revealable = true) =>
+    request('POST', '/api/secrets', { repoPath, kind, key, value, workflowFile, revealable }),
   deleteSecret: (repoPath, kind, key, workflowFile = '') =>
     request('DELETE', '/api/secrets', { repoPath, kind, key, workflowFile }),
   getEventPayload: (repoPath, workflowFile) =>

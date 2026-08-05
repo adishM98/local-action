@@ -776,3 +776,85 @@ func TestAPI_WorkflowFileMTime_RejectsPathEscape(t *testing.T) {
 		t.Fatalf("expected 400 for a path escape, got %d", resp.StatusCode)
 	}
 }
+
+func TestAPI_GetSecretValue(t *testing.T) {
+	stubDir := t.TempDir()
+	stubPath := filepath.Join(stubDir, "fake-act.sh")
+	if err := os.WriteFile(stubPath, []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
+		t.Fatalf("write stub: %v", err)
+	}
+	mux, _, _ := newTestRouter(t, stubPath)
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	for _, kind := range []string{"secret", "var"} {
+		body, _ := json.Marshal(map[string]any{"repoPath": "/r", "kind": kind, "key": "FOO", "value": "bar-" + kind, "revealable": true})
+		resp, err := http.Post(server.URL+"/api/secrets", "application/json", bytes.NewReader(body))
+		if err != nil || resp.StatusCode != http.StatusNoContent {
+			t.Fatalf("upsert %s: err=%v status=%v", kind, err, resp.StatusCode)
+		}
+
+		resp, err = http.Get(server.URL + "/api/secrets/value?repoPath=/r&kind=" + kind + "&key=FOO")
+		if err != nil {
+			t.Fatalf("get value %s: %v", kind, err)
+		}
+		var got struct {
+			Value string `json:"value"`
+		}
+		json.NewDecoder(resp.Body).Decode(&got)
+		resp.Body.Close()
+		if got.Value != "bar-"+kind {
+			t.Errorf("kind=%s: expected value %q, got %q", kind, "bar-"+kind, got.Value)
+		}
+	}
+}
+
+// TestAPI_GetSecretValue_RefusesWriteOnly guards the actual point of the
+// write-only choice: it must be enforced here, not just hidden client-side,
+// or a direct call to this endpoint would defeat "this value can't be
+// viewed again" the moment someone bypassed the UI.
+func TestAPI_GetSecretValue_RefusesWriteOnly(t *testing.T) {
+	stubDir := t.TempDir()
+	stubPath := filepath.Join(stubDir, "fake-act.sh")
+	if err := os.WriteFile(stubPath, []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
+		t.Fatalf("write stub: %v", err)
+	}
+	mux, _, _ := newTestRouter(t, stubPath)
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	body, _ := json.Marshal(map[string]any{"repoPath": "/r", "kind": "secret", "key": "SHH", "value": "top-secret", "revealable": false})
+	resp, err := http.Post(server.URL+"/api/secrets", "application/json", bytes.NewReader(body))
+	if err != nil || resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("upsert: err=%v status=%v", err, resp.StatusCode)
+	}
+
+	resp, err = http.Get(server.URL + "/api/secrets/value?repoPath=/r&kind=secret&key=SHH")
+	if err != nil {
+		t.Fatalf("get value: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected the write-only entry's value to be refused, got status %d", resp.StatusCode)
+	}
+}
+
+func TestAPI_GetSecretValue_NotFound(t *testing.T) {
+	stubDir := t.TempDir()
+	stubPath := filepath.Join(stubDir, "fake-act.sh")
+	if err := os.WriteFile(stubPath, []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
+		t.Fatalf("write stub: %v", err)
+	}
+	mux, _, _ := newTestRouter(t, stubPath)
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/api/secrets/value?repoPath=/r&kind=secret&key=NOPE")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected 404 for a missing entry, got %d", resp.StatusCode)
+	}
+}

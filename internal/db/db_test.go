@@ -171,3 +171,48 @@ func TestGetSetMeta(t *testing.T) {
 		t.Fatalf("expected updated value 0.9.1, got %q", v)
 	}
 }
+
+func TestOpenDB_MigratesOldSecretsSchemaAddsRevealable(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "old.db")
+
+	old, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatalf("open raw: %v", err)
+	}
+	if _, err := old.Exec(`
+		CREATE TABLE secrets (
+		  repo_path TEXT NOT NULL,
+		  kind TEXT NOT NULL,
+		  key TEXT NOT NULL,
+		  workflow_file TEXT NOT NULL DEFAULT '',
+		  value_encrypted BLOB NOT NULL,
+		  PRIMARY KEY (repo_path, kind, key, workflow_file)
+		);
+		INSERT INTO secrets (repo_path, kind, key, value_encrypted) VALUES ('/repo/a', 'secret', 'FOO', x'DEADBEEF');
+	`); err != nil {
+		t.Fatalf("seed old schema: %v", err)
+	}
+	old.Close()
+
+	db, err := OpenDB(path)
+	if err != nil {
+		t.Fatalf("open with migration: %v", err)
+	}
+	defer db.Close()
+
+	var revealable int
+	if err := db.QueryRow(`SELECT revealable FROM secrets WHERE repo_path = '/repo/a'`).Scan(&revealable); err != nil {
+		t.Fatalf("query migrated row: %v", err)
+	}
+	if revealable != 1 {
+		t.Fatalf("expected pre-existing row to default to revealable=1, got %d", revealable)
+	}
+
+	// Re-open: migration must be idempotent.
+	db.Close()
+	db2, err := OpenDB(path)
+	if err != nil {
+		t.Fatalf("re-open after migration: %v", err)
+	}
+	db2.Close()
+}
