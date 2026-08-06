@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Star, Layers, Loader2, XCircle, CheckCircle2, AlertTriangle, Package, GitBranch, Pencil, FolderOpen, Clock } from 'lucide-react'
+import { Star, Layers, Loader2, XCircle, CheckCircle2, AlertTriangle, Package, GitBranch, FolderOpen, Clock } from 'lucide-react'
 import StatusIcon, { StatusCircle } from './StatusIcon.jsx'
 import {
   computeRunStats,
@@ -110,18 +110,6 @@ export default function Overview({ repoPath, onCommit, branch, workflows, runs, 
   const lastStatus = lastStatusByWorkflow(runs)
   const incompatible = workflows.filter((w) => w.incompatibleRunners?.length > 0)
 
-  // The one thing a developer actually wants to know at a glance: is
-  // anything broken right now? Color and copy only escalate when there's
-  // something to react to — a healthy repo stays quiet/gray, not
-  // celebratory-green, so the moment something needs attention is the
-  // moment the page visibly changes.
-  const status =
-    stats.failed > 0
-      ? { tone: 'bad', text: `${stats.failed} workflow${stats.failed === 1 ? '' : 's'} failing` }
-      : stats.running > 0
-        ? { tone: 'active', text: `${stats.running} workflow${stats.running === 1 ? '' : 's'} running` }
-        : { tone: 'ok', text: 'Everything looks good — no failed workflows' }
-
   return (
     <div className="overview">
       <div className="overview__head">
@@ -195,12 +183,24 @@ export default function Overview({ repoPath, onCommit, branch, workflows, runs, 
             </div>
           ) : (
             <div className="overview__identity-text">
-              <h2>{repoNameFor(repoPath)}</h2>
-              <button
-                className="repo-header__meta"
-                onClick={() => setEditing(true)}
-                title={`${repoPath} — click to change`}
-              >
+              <div className="overview__identity-top">
+                <h2>{repoNameFor(repoPath)}</h2>
+                {/* A folder icon, not a pencil — the action is "point
+                    this at a different local repo", not "edit metadata".
+                    Sits right next to the name it acts on, not floating
+                    off in the card's far corner. */}
+                <button
+                  className="repo-header__browse repo-header__browse--inline"
+                  onClick={() => setEditing(true)}
+                  title="Change repository"
+                >
+                  <FolderOpen size={13} />
+                </button>
+              </div>
+              {/* Plain text now, not a button — the action that used to
+                  live here (enter edit mode) moved to the button above.
+                  Branch is metadata to read, not something you click. */}
+              <span className="repo-header__meta" title={repoPath}>
                 {branch ? (
                   <>
                     <span className="repo-header__meta-icon">
@@ -211,195 +211,210 @@ export default function Overview({ repoPath, onCommit, branch, workflows, runs, 
                 ) : (
                   <span className="repo-header__meta-path">{repoPath}</span>
                 )}
-                <Pencil size={11} className="repo-header__meta-edit" />
-              </button>
+              </span>
             </div>
           )}
         </div>
-        {repoPath && <p className={`overview__status overview__status--${status.tone}`}>{status.text}</p>}
+        {repoPath && !editing && (
+          <p className="overview__meta-line">
+            {workflows.length} workflow{workflows.length === 1 ? '' : 's'} ·{' '}
+            <span className={stats.running > 0 ? 'overview__meta-count--active' : undefined}>
+              {stats.running} running
+            </span>{' '}
+            ·{' '}
+            <span className={stats.failed > 0 ? 'overview__meta-count--bad' : undefined}>
+              {stats.failed} failed
+            </span>
+          </p>
+        )}
       </div>
 
       {!repoPath ? (
         <p className="empty-state">Enter a repo path above to get started.</p>
       ) : (
         <>
-          <div className="overview__tiles">
-            <div className="overview__tile">
-              <span className="overview__tile-value">{workflows.length}</span>
-              <span className="overview__tile-label">Workflows</span>
-            </div>
-            <div className={`overview__tile${stats.running > 0 ? ' overview__tile--active' : ''}`}>
-              <span className="overview__tile-value">{stats.running}</span>
-              <span className="overview__tile-label">Running</span>
-            </div>
-            <div className={`overview__tile${stats.failed > 0 ? ' overview__tile--bad' : ''}`}>
-              <span className="overview__tile-value">{stats.failed}</span>
-              <span className="overview__tile-label">Failed</span>
-            </div>
-          </div>
-
-      {incompatible.length > 0 && (
-        <div className="overview__card overview__incompatible-card">
-          <h3 className="overview__section-title">
-            <AlertTriangle size={14} /> Runner compatibility ({incompatible.length})
-          </h3>
-          <section className="overview__section">
-            {incompatible.map((wf) => (
-              <button
-                className="overview__row"
-                key={wf.file}
-                onClick={() => onNavigate({ name: 'runs', workflowFile: wf.file })}
-                title={`act only emulates Linux — this may fail or behave differently than real CI`}
-              >
-                <AlertTriangle size={14} className="overview__row-warn-icon" />
-                <span className="overview__row-main">
-                  <span className="overview__row-name">{wf.name}</span>
-                  <span className="overview__row-meta">
-                    runs-on <code>{wf.incompatibleRunners.join(', ')}</code>
-                  </span>
-                </span>
-              </button>
-            ))}
-          </section>
-        </div>
-      )}
-
-      {runs.length === 0 ? (
-        <div className="empty-state empty-state--rich">
-          <p className="empty-state__heading">No workflow has run yet</p>
-          <p>Pick a workflow from the sidebar and trigger a run to see activity here.</p>
-        </div>
-      ) : (
-        <div className="overview__grid">
-          {active.length > 0 && (
-            <div className="overview__card">
+          {incompatible.length > 0 && (
+            <div className="overview__card overview__incompatible-card">
               <h3 className="overview__section-title">
-                <Loader2 size={14} className="spin" /> Running ({active.length})
+                <AlertTriangle size={14} /> Runner compatibility ({incompatible.length})
               </h3>
               <section className="overview__section">
-                {active.map((run) => (
-                  <button className="overview__row" key={run.id} onClick={() => onOpenRun(run.id)}>
-                    <StatusIcon status={run.status} />
-                    <span className="overview__row-main">
-                      <span className="overview__row-name">{wfName(run.workflowFile)}</span>
-                      <span className="overview__row-meta">{run.branch || run.event}</span>
-                    </span>
-                    <span className="overview__row-time">{duration(run) || 'starting…'}</span>
-                  </button>
-                ))}
-              </section>
-            </div>
-          )}
-
-          {failures.length > 0 && (
-            <div className="overview__card">
-              <h3 className="overview__section-title">
-                <XCircle size={14} /> Failures ({stats.failed})
-              </h3>
-              <section className="overview__section">
-                {failures.map((run) => (
-                  <button className="overview__row" key={run.id} onClick={() => onOpenRun(run.id)}>
-                    <StatusIcon status={run.status} />
-                    <span className="overview__row-main">
-                      <span className="overview__row-name">{wfName(run.workflowFile)}</span>
-                      <span className="overview__row-meta">{run.branch || run.event}</span>
-                    </span>
-                    <span className="overview__row-time">{relativeTime(run.createdAt)}</span>
-                  </button>
-                ))}
-              </section>
-            </div>
-          )}
-
-          <div className="overview__card">
-            <h3 className="overview__section-title">
-              <CheckCircle2 size={14} /> Recent activity
-            </h3>
-            <section className="overview__section">
-              {recent.map((run) => (
-                <button className="overview__row" key={run.id} onClick={() => onOpenRun(run.id)}>
-                  <StatusIcon status={run.status} />
-                  <span className="overview__row-name">{wfName(run.workflowFile)}</span>
-                  <span className="overview__row-time">{relativeTime(run.createdAt)}</span>
-                </button>
-              ))}
-            </section>
-          </div>
-
-          <div className="overview__card overview__section--wide">
-            <h3 className="overview__section-title">
-              <Layers size={14} /> Repository health
-            </h3>
-            <section className="overview__section">
-              {stats.total > 0 && (
-                <div className="overview__success">
-                  <div className="overview__success-bar">
-                    <div
-                      className="overview__success-fill"
-                      style={{ width: `${Math.round((stats.passed / stats.total) * 100)}%` }}
-                    />
-                  </div>
-                  <span className="overview__success-pct">{Math.round((stats.passed / stats.total) * 100)}%</span>
-                </div>
-              )}
-              <dl className="overview__health">
-                <div>
-                  <dt>Avg. build time</dt>
-                  <dd>{stats.avgDurationMs != null ? formatDurationMs(stats.avgDurationMs) : '—'}</dd>
-                </div>
-                <div>
-                  <dt>Avg. queue time</dt>
-                  <dd>{stats.avgQueueMs != null ? formatDurationMs(stats.avgQueueMs) : '—'}</dd>
-                </div>
-                <div>
-                  <dt>Longest run</dt>
-                  <dd>{longest ? `${longest.name} · ${formatDurationMs(longest.durationMs)}` : '—'}</dd>
-                </div>
-              </dl>
-              <div className="overview__trend" title="Success rate, last 7 days">
-                {trend.map((day, i) => (
-                  <div className="overview__trend-col" key={i}>
-                    <div className="overview__trend-track">
-                      <div
-                        className={`overview__trend-bar${day.pct == null ? ' overview__trend-bar--empty' : ''}`}
-                        style={{ height: `${day.pct ?? 6}%` }}
-                        title={day.pct == null ? 'No runs' : `${day.pct}% success`}
-                      />
-                    </div>
-                    <span className="overview__trend-label">{DAY_LABEL[day.date.getDay()]}</span>
-                  </div>
-                ))}
-              </div>
-            </section>
-          </div>
-
-          {pinned.length > 0 && (
-            <div className="overview__card">
-              <h3 className="overview__section-title">
-                <Star size={14} fill="currentColor" /> Pinned workflows
-              </h3>
-              <section className="overview__section">
-                {pinned.map((wf) => (
+                {incompatible.map((wf) => (
                   <button
                     className="overview__row"
                     key={wf.file}
                     onClick={() => onNavigate({ name: 'runs', workflowFile: wf.file })}
+                    title={`act only emulates Linux — this may fail or behave differently than real CI`}
                   >
-                    {lastStatus[wf.file] ? (
-                      <StatusCircle status={lastStatus[wf.file]} />
-                    ) : (
-                      <span className="status-circle status-circle--none" />
-                    )}
+                    <AlertTriangle size={14} className="overview__row-warn-icon" />
                     <span className="overview__row-main">
                       <span className="overview__row-name">{wf.name}</span>
+                      <span className="overview__row-meta">
+                        runs-on <code>{wf.incompatibleRunners.join(', ')}</code>
+                      </span>
                     </span>
                   </button>
                 ))}
               </section>
             </div>
           )}
-        </div>
-      )}
+
+          {runs.length === 0 ? (
+            <div className="empty-state empty-state--rich">
+              <p className="empty-state__heading">No workflow has run yet</p>
+              {workflows.length === 0 ? (
+                <p>
+                  Add a workflow file under <code>.github/workflows</code>, then rescan the repo to get started.
+                </p>
+              ) : (
+                <>
+                  <ol className="empty-state__steps">
+                    <li>Pick a workflow from the Explorer in the sidebar</li>
+                    <li>Choose an event to simulate</li>
+                    <li>Click Run</li>
+                  </ol>
+                  {workflows.length === 1 && (
+                    <button
+                      className="btn btn--primary empty-state__cta"
+                      onClick={() => onNavigate({ name: 'runs', workflowFile: workflows[0].file })}
+                    >
+                      Open {workflows[0].name}
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="overview__grid">
+              {active.length > 0 && (
+                <div className="overview__card">
+                  <h3 className="overview__section-title">
+                    <Loader2 size={14} className="spin" /> Running ({active.length})
+                  </h3>
+                  <section className="overview__section">
+                    {active.map((run) => (
+                      <button className="overview__row" key={run.id} onClick={() => onOpenRun(run.id)}>
+                        <StatusIcon status={run.status} />
+                        <span className="overview__row-main">
+                          <span className="overview__row-name">{wfName(run.workflowFile)}</span>
+                          <span className="overview__row-meta">{run.branch || run.event}</span>
+                        </span>
+                        <span className="overview__row-time">{duration(run) || 'starting…'}</span>
+                      </button>
+                    ))}
+                  </section>
+                </div>
+              )}
+    
+              {failures.length > 0 && (
+                <div className="overview__card">
+                  <h3 className="overview__section-title">
+                    <XCircle size={14} /> Failures ({stats.failed})
+                  </h3>
+                  <section className="overview__section">
+                    {failures.map((run) => (
+                      <button className="overview__row" key={run.id} onClick={() => onOpenRun(run.id)}>
+                        <StatusIcon status={run.status} />
+                        <span className="overview__row-main">
+                          <span className="overview__row-name">{wfName(run.workflowFile)}</span>
+                          <span className="overview__row-meta">{run.branch || run.event}</span>
+                        </span>
+                        <span className="overview__row-time">{relativeTime(run.createdAt)}</span>
+                      </button>
+                    ))}
+                  </section>
+                </div>
+              )}
+    
+              <div className="overview__card">
+                <h3 className="overview__section-title">
+                  <CheckCircle2 size={14} /> Recent activity
+                </h3>
+                <section className="overview__section">
+                  {recent.map((run) => (
+                    <button className="overview__row" key={run.id} onClick={() => onOpenRun(run.id)}>
+                      <StatusIcon status={run.status} />
+                      <span className="overview__row-name">{wfName(run.workflowFile)}</span>
+                      <span className="overview__row-time">{relativeTime(run.createdAt)}</span>
+                    </button>
+                  ))}
+                </section>
+              </div>
+    
+              <div className="overview__card overview__section--wide">
+                <h3 className="overview__section-title">
+                  <Layers size={14} /> Repository health
+                </h3>
+                <section className="overview__section">
+                  {stats.total > 0 && (
+                    <div className="overview__success">
+                      <div className="overview__success-bar">
+                        <div
+                          className="overview__success-fill"
+                          style={{ width: `${Math.round((stats.passed / stats.total) * 100)}%` }}
+                        />
+                      </div>
+                      <span className="overview__success-pct">{Math.round((stats.passed / stats.total) * 100)}%</span>
+                    </div>
+                  )}
+                  <dl className="overview__health">
+                    <div>
+                      <dt>Avg. build time</dt>
+                      <dd>{stats.avgDurationMs != null ? formatDurationMs(stats.avgDurationMs) : '—'}</dd>
+                    </div>
+                    <div>
+                      <dt>Avg. queue time</dt>
+                      <dd>{stats.avgQueueMs != null ? formatDurationMs(stats.avgQueueMs) : '—'}</dd>
+                    </div>
+                    <div>
+                      <dt>Longest run</dt>
+                      <dd>{longest ? `${longest.name} · ${formatDurationMs(longest.durationMs)}` : '—'}</dd>
+                    </div>
+                  </dl>
+                  <div className="overview__trend" title="Success rate, last 7 days">
+                    {trend.map((day, i) => (
+                      <div className="overview__trend-col" key={i}>
+                        <div className="overview__trend-track">
+                          <div
+                            className={`overview__trend-bar${day.pct == null ? ' overview__trend-bar--empty' : ''}`}
+                            style={{ height: `${day.pct ?? 6}%` }}
+                            title={day.pct == null ? 'No runs' : `${day.pct}% success`}
+                          />
+                        </div>
+                        <span className="overview__trend-label">{DAY_LABEL[day.date.getDay()]}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              </div>
+    
+              {pinned.length > 0 && (
+                <div className="overview__card">
+                  <h3 className="overview__section-title">
+                    <Star size={14} fill="currentColor" /> Pinned workflows
+                  </h3>
+                  <section className="overview__section">
+                    {pinned.map((wf) => (
+                      <button
+                        className="overview__row"
+                        key={wf.file}
+                        onClick={() => onNavigate({ name: 'runs', workflowFile: wf.file })}
+                      >
+                        {lastStatus[wf.file] ? (
+                          <StatusCircle status={lastStatus[wf.file]} />
+                        ) : (
+                          <span className="status-circle status-circle--none" />
+                        )}
+                        <span className="overview__row-main">
+                          <span className="overview__row-name">{wf.name}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </section>
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
     </div>

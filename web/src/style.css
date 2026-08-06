@@ -152,36 +152,28 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 /* Always-visible hairline border so this reads as a clickable field at
    rest, not plain static text — the earlier text-only treatment tested as
    "is this even clickable?" */
-/* Plain text at rest — the bordered "field" look tested as oversized in
-   practice; the pencil icon plus a hover color change is enough affordance
-   without a persistent chip/box around it. */
+/* Plain text, not a button — the click-to-edit action lives on the
+   card-level button now (.overview__head-actions), not glued to the
+   branch label. Full path is still available via the title tooltip. */
 .repo-header__meta {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: none;
-  border: none;
-  padding: 2px 0;
-  color: var(--text);
-  opacity: 0.7;
+  margin-top: 6px;
+  color: var(--muted);
   font-size: 13px;
-  cursor: pointer;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  transition: opacity 150ms ease;
 }
-.repo-header__meta:hover { opacity: 1; }
-.repo-header__meta:hover .repo-header__meta-edit { opacity: 1; }
 .repo-header__meta-icon { flex-shrink: 0; }
 /* Branch is the primary thing developers care about here — the full path
-   is secondary metadata, revealed only on hover/focus. */
+   is secondary metadata, revealed only on hover via the title tooltip. */
 /* Only rendered when there's no branch to show (e.g. not a git repo) —
-   the full path otherwise lives in this button's title tooltip, not
+   the full path otherwise lives in this element's title tooltip, not
    inline, per feedback that it "doesn't need to be visible all the time". */
 .repo-header__meta-path { font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; }
-.repo-header__meta-edit { flex-shrink: 0; margin-left: 2px; opacity: 0.6; transition: opacity 150ms ease; }
 
 .repo-header__path-wrap { flex: 1; display: flex; align-items: center; gap: 6px; }
 .repo-header__path-input {
@@ -531,8 +523,16 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
   background: var(--border);
 }
 .sidebar__item-row { position: relative; display: flex; align-items: center; }
-.sidebar__item-row .sidebar__item { flex: 1; padding-left: 40px; }
+/* padding-right reserves the pin star's own space (it's positioned
+   absolute, so it doesn't take any layout width on its own) — without it
+   a long workflow name has no reason to truncate before running under
+   the star instead of stopping short of it. */
+.sidebar__item-row .sidebar__item { flex: 1; padding-left: 40px; padding-right: 28px; }
 .sidebar__item-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+/* The actual truncating element — .sidebar__item's own ellipsis rule
+   doesn't reach through the flex layout in between (.sidebar__item--flat,
+   .sidebar__item-text) to affect this nested span. */
+.sidebar__item-label { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sidebar__item-meta {
   display: flex;
   gap: 6px;
@@ -618,6 +618,23 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 
 .empty-state--rich { text-align: center; padding: 40px 20px; }
 .empty-state__heading { font-size: 16px; font-weight: 600; color: var(--text); margin: 0 0 6px; }
+/* A block box (not inline-block) so it always forces its own line — the
+   CTA button right after it needs to land on the next line, not float
+   beside it. max-width + auto margins center the box itself under the
+   text-align:center parent, while left-aligning its own numbered items —
+   a plain <ol> would otherwise center each line individually, which
+   reads oddly for steps. */
+.empty-state__steps {
+  display: block;
+  max-width: 320px;
+  text-align: left;
+  margin: 14px auto 18px;
+  padding-left: 20px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.9;
+}
+.empty-state__cta { margin-top: 4px; }
 
 .pagination {
   display: flex;
@@ -1238,22 +1255,41 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 .chip:hover { border-color: var(--text); color: var(--text); }
 
 /* ── Overview page ───────────────────────────────────── */
-.overview__head { margin-bottom: 20px; }
+/* Same surface recipe as .overview__section below (panel bg + hairline
+   border + 10px radius) so the header reads as one more card in the same
+   language instead of floating text above the real cards. */
+.overview__head {
+  margin-bottom: 20px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 18px;
+}
 /* Repo identity moved here from the sidebar — this is the one place you
-   can change the repo path now, so it carries the icon/branch/edit
-   affordance the sidebar used to have. The sidebar keeps a plain
-   read-only name so you always know where you are. */
-.overview__identity { display: flex; align-items: center; gap: 12px; }
+   can change the repo path now. The sidebar keeps a plain read-only name
+   so you always know where you are. */
+.overview__identity { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .overview__identity-icon { color: var(--muted); flex-shrink: 0; }
 .overview__identity-text { min-width: 0; }
 .overview__identity-text h2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .overview__identity-input { flex: 1; max-width: 420px; }
-/* The status line is the actual hero — "is anything broken?" answered in
-   one sentence before a single number is read. Stays gray/quiet when
-   healthy; only escalates color when there's something to react to. */
-.overview__status { margin: 6px 0 0; font-size: 14px; color: var(--muted); }
-.overview__status--active { color: var(--blue); }
-.overview__status--bad { color: var(--red); }
+/* Name + change-repo button on one line — the button sits right next to
+   the thing it acts on instead of floating in the card's corner. */
+.overview__identity-top { display: flex; align-items: center; gap: 8px; }
+.overview__identity-top h2 { margin: 0; }
+/* Smaller than the edit-mode browse button (that one stands alone next
+   to a full-width input) — this one sits inline next to a heading, so it
+   only needs to be big enough to hit, not to anchor a whole row. */
+.repo-header__browse--inline { width: 24px; height: 24px; border-radius: 7px; flex-shrink: 0; }
+/* The actual counts, once, right under the name — replaces the three
+   separate KPI tiles that used to sit below the header (still used by
+   RunsView's own StatCards, just not duplicated here anymore). Quiet by
+   default; a nonzero running/failed count colors just that number
+   instead of a separate chip — a single failed run out of many otherwise
+   turns the whole card red, which reads far more alarming than it is. */
+.overview__meta-line { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+.overview__meta-count--active { color: var(--blue); font-weight: 600; }
+.overview__meta-count--bad { color: var(--red); font-weight: 600; }
 
 /* Tiles, not cards — no border/background/box. A plain number+label pair
    separated by a hairline divider, so three of them read as one quiet
