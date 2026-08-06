@@ -11,10 +11,7 @@ Selfhosted web UI for running GitHub Actions workflows locally, via Docker — w
 Single user, no auth, no accounts. Meant to run on your own machine or a home server, bound to `localhost` only.
 
 <p align="center">
-  <video src="docs/demo.mp4" poster="docs/application.png" controls muted loop width="800">
-    Your browser doesn't support inline video —
-    <a href="docs/demo.mp4">watch/download the demo here</a>.
-  </video>
+  <img src="docs/demo.gif" alt="local-action demo — browsing workflows, running one, and watching live logs" width="800">
 </p>
 
 ## Install
