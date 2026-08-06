@@ -1439,22 +1439,54 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 .empty-state { color: var(--muted); padding: 24px 0; }
 
 /* ── Terminal panel ──────────────────────────────────── */
-.terminal-panel { flex-shrink: 0; border-top: 1px solid var(--border); background: var(--panel); display: flex; flex-direction: column; }
+/* This whole panel — tab bar included, not just the xterm well — stays
+   dark always, in both themes. Local --tp-* vars pinned to the app's own
+   dark-theme values (not the global --panel/--text/etc, which flip with
+   the theme) so the bar doesn't go light-gray-chrome-around-a-black-box
+   in light mode; it reads as one consistently dark tool, same as most
+   editors keep their integrated terminal dark regardless of UI theme. */
+.terminal-panel {
+  --tp-panel: #0a0a0a;
+  --tp-panel-2: #141414;
+  --tp-border: rgba(255, 255, 255, 0.14);
+  --tp-text: #f5f5f5;
+  --tp-muted: #a1a1aa;
+  --tp-faint: #71717a;
+  flex-shrink: 0;
+  border-top: 1px solid var(--tp-border);
+  background: var(--tp-panel);
+  display: flex;
+  flex-direction: column;
+}
 .terminal-panel__bar { display: flex; align-items: center; gap: 4px; height: 34px; padding: 0 6px 0 0; }
-.terminal-panel__toggle { display: flex; align-items: center; gap: 6px; background: none; border: none; color: var(--muted); font-size: 12px; cursor: pointer; height: 100%; padding: 0 10px; }
-.terminal-panel__toggle:hover, .terminal-panel--open .terminal-panel__toggle { color: var(--text); }
+.terminal-panel__toggle { display: flex; align-items: center; gap: 6px; background: none; border: none; color: var(--tp-muted); font-size: 12px; cursor: pointer; height: 100%; padding: 0 10px; }
+.terminal-panel__toggle:hover, .terminal-panel--open .terminal-panel__toggle { color: var(--tp-text); }
 /* Closed: nothing else is in the bar yet, so the whole strip should react —
    not just the tight box around the icon+label. */
 .terminal-panel:not(.terminal-panel--open) .terminal-panel__toggle { flex: 1; justify-content: flex-start; }
 .terminal-panel__tabs { display: flex; align-items: center; gap: 2px; flex: 1; overflow-x: auto; margin-left: 8px; }
 .terminal-panel__tab { display: flex; align-items: center; gap: 2px; padding: 3px 4px 3px 10px; border-radius: 6px; }
-.terminal-panel__tab--active { background: var(--panel-2); }
-.terminal-panel__tab-label { background: none; border: none; color: var(--muted); font-size: 12px; cursor: pointer; padding: 2px 4px; }
-.terminal-panel__tab--active .terminal-panel__tab-label { color: var(--text); }
-.terminal-panel__tab-close { display: flex; background: none; border: none; color: var(--faint); cursor: pointer; padding: 3px; border-radius: 4px; }
-.terminal-panel__tab-close:hover { background: var(--border); color: var(--text); }
-.terminal-panel__new, .terminal-panel__collapse { display: flex; background: none; border: none; color: var(--muted); cursor: pointer; padding: 5px 6px; border-radius: 6px; }
-.terminal-panel__new:hover, .terminal-panel__collapse:hover { color: var(--text); background: var(--panel-2); }
+.terminal-panel__tab--active { background: var(--tp-panel-2); }
+.terminal-panel__tab-label { background: none; border: none; color: var(--tp-muted); font-size: 12px; cursor: pointer; padding: 2px 4px; }
+.terminal-panel__tab--active .terminal-panel__tab-label { color: var(--tp-text); }
+.terminal-panel__tab-close { display: flex; background: none; border: none; color: var(--tp-faint); cursor: pointer; padding: 3px; border-radius: 4px; }
+.terminal-panel__tab-close:hover { background: var(--tp-border); color: var(--tp-text); }
+.terminal-panel__new, .terminal-panel__collapse { display: flex; background: none; border: none; color: var(--tp-muted); cursor: pointer; padding: 5px 6px; border-radius: 6px; }
+.terminal-panel__new:hover, .terminal-panel__collapse:hover { color: var(--tp-text); background: var(--tp-panel-2); }
 .terminal-panel__body { height: 300px; padding: 8px 10px 10px; overflow: hidden; }
-.terminal-view { height: 100%; width: 100%; }
-.terminal-panel__empty { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--muted); font-size: 13px; }
+/* xterm's own stylesheet hardcodes the viewport to #000 (terminals stay
+   dark regardless of app theme — flipping it light would wash out
+   whatever ANSI colors the shell is already outputting, which assume a
+   dark backdrop). Framing it like every other panel — rounded corners +
+   a border, clipped via overflow:hidden since xterm's background lives
+   on an inner div we don't control — is what was missing: a flush,
+   corner-less black rectangle reads fine in dark theme (blends into
+   --panel) but sits like a hole cut out of the light theme's soft,
+   card-based chrome. */
+/* Border stays black in both themes, not var(--border) — the terminal
+   itself is always black (xterm's own doing, see above), so a
+   theme-following gray border would visibly seam where the black
+   viewport meets it in light mode. A black-on-black frame keeps it
+   reading as one solid dark unit instead of two mismatched shades. */
+.terminal-view { height: 100%; width: 100%; border: 1px solid #000; border-radius: 8px; overflow: hidden; }
+.terminal-panel__empty { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--tp-muted); font-size: 13px; }

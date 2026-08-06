@@ -35,17 +35,6 @@ export default function TerminalPanel({ repoPath }) {
       .catch(() => {})
   }, [repoPath])
 
-  useEffect(() => {
-    function onKeyDown(e) {
-      if (e.ctrlKey && e.key === '`') {
-        e.preventDefault()
-        setOpen((o) => !o)
-      }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [])
-
   async function newTab() {
     const { id } = await api.createTerminalSession(repoPath)
     setTabs((t) => [...t, id])
@@ -65,7 +54,7 @@ export default function TerminalPanel({ repoPath }) {
   return (
     <div className={`terminal-panel${open ? ' terminal-panel--open' : ''}`}>
       <div className="terminal-panel__bar">
-        <button className="terminal-panel__toggle" onClick={() => setOpen((o) => !o)} title="Toggle terminal (Ctrl+`)">
+        <button className="terminal-panel__toggle" onClick={() => setOpen((o) => !o)} title="Toggle terminal">
           <SquareTerminal size={14} />
           Terminal
         </button>
