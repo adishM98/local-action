@@ -1111,6 +1111,14 @@ h3 { font-size: 14px; font-weight: 600; margin: 0; }
 .workflow-source { font-family: var(--mono); font-size: 12.5px; padding: 8px 0; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); max-height: calc(100vh - 260px); overflow-y: auto; }
 .workflow-source__line--failed { background: rgba(248, 81, 73, 0.12); border-left: 2px solid var(--red); }
 .workflow-source__line--failed .log-line__no { color: var(--red); }
+/* Minimal YAML token palette, reusing the app's existing status colors
+   instead of a separate syntax theme — stays correct across the light/dark
+   toggle for free, no separate theme file to keep in sync. */
+.workflow-source .token.key { color: var(--blue); }
+.workflow-source .token.string { color: var(--green); }
+.workflow-source .token.comment { color: var(--faint); font-style: italic; }
+.workflow-source .token.number, .workflow-source .token.boolean { color: var(--yellow); }
+.workflow-source .token.punctuation { color: var(--muted); }
 
 .step { border-bottom: 1px solid var(--border); }
 .step:last-child { border-bottom: none; }

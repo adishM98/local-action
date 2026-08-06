@@ -1,4 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
+import Prism from 'prismjs'
+import 'prismjs/components/prism-yaml'
 
 // Jobs are already in file order (see JobInfo.Line in scanner.go) — each
 // job's block runs from its own line to just before the next job's line,
@@ -27,7 +29,19 @@ function stepRange(stepName, job, jobBounds) {
 
 export default function WorkflowSource({ source, jobs, highlightJobId, highlightStepName }) {
   const containerRef = useRef(null)
-  const lines = source.split('\n')
+  const lines = useMemo(() => source.split('\n'), [source])
+  // Tokenized per line, not as one Prism.highlight() call over the whole
+  // file: a real YAML parse would let a multi-line block scalar's markup
+  // span several lines, which can't be split back into our one-div-per-line
+  // layout (needed for scrollIntoView + the failed-block background) without
+  // risking an HTML tag getting cut in half. Per line, Prism just sees a
+  // continuation line (e.g. inside a `run: |` shell block) as plain
+  // unstyled text when it doesn't look like YAML on its own — the trade-off
+  // for never producing broken markup.
+  const highlighted = useMemo(
+    () => lines.map((text) => Prism.highlight(text, Prism.languages.yaml, 'yaml')),
+    [lines],
+  )
   const job = jobs.find((j) => j.id === highlightJobId)
   const jobBounds = job ? jobRange(job, jobs, lines.length) : null
   const highlight = (job && jobBounds && stepRange(highlightStepName, job, jobBounds)) || jobBounds
@@ -39,13 +53,13 @@ export default function WorkflowSource({ source, jobs, highlightJobId, highlight
 
   return (
     <div className="workflow-source" ref={containerRef}>
-      {lines.map((text, i) => {
+      {lines.map((_, i) => {
         const no = i + 1
         const failed = highlight && no >= highlight.start && no <= highlight.end
         return (
           <div key={no} data-line={no} className={`log-line workflow-source__line${failed ? ' workflow-source__line--failed' : ''}`}>
             <span className="log-line__no">{no}</span>
-            <span className="log-line__text">{text}</span>
+            <span className="log-line__text" dangerouslySetInnerHTML={{ __html: highlighted[i] }} />
           </div>
         )
       })}
